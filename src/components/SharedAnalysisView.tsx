@@ -4,12 +4,14 @@ import type { DemoAnalysisResponse } from "@/components/DemoSection";
 import { supabase } from "@/lib/supabase";
 import { Button } from "@/components/ui/button";
 import { exportAnalysisToPdf } from "@/lib/pdfExport";
+import { SpecialistRequestModal } from "@/components/SpecialistRequestModal";
 import { ArrowLeft, Download } from "lucide-react";
 
 export default function SharedAnalysisView({ shareId }: { shareId: string }) {
   const [result, setResult] = useState<DemoAnalysisResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [specialistModalOpen, setSpecialistModalOpen] = useState(false);
   const panelRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
@@ -77,6 +79,13 @@ export default function SharedAnalysisView({ shareId }: { shareId: string }) {
             Back to Shura
           </a>
           <div className="flex flex-wrap items-center gap-2 sm:gap-3">
+            <button
+              type="button"
+              onClick={() => setSpecialistModalOpen(true)}
+              className="text-xs font-medium text-primary hover:text-primary/80"
+            >
+              Request a specialist
+            </button>
             <a
               href="https://shura-gilt.vercel.app/#cta"
               target="_blank"
@@ -91,6 +100,10 @@ export default function SharedAnalysisView({ shareId }: { shareId: string }) {
             </Button>
           </div>
         </div>
+        <SpecialistRequestModal
+          open={specialistModalOpen}
+          onClose={() => setSpecialistModalOpen(false)}
+        />
         <ResultPanel result={result} panelRef={panelRef} decisionId={shareId} />
       </div>
     </div>

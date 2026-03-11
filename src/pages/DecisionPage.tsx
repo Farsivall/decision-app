@@ -3,9 +3,11 @@ import DemoSection from "@/components/DemoSection";
 import GradientBlobs from "@/components/GradientBlobs";
 import BackgroundCards from "@/components/BackgroundCards";
 import SharedAnalysisView from "@/components/SharedAnalysisView";
+import { SpecialistRequestModal } from "@/components/SpecialistRequestModal";
 
 export default function DecisionPage() {
   const [shareId, setShareId] = useState<string | null>(null);
+  const [specialistModalOpen, setSpecialistModalOpen] = useState(false);
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
@@ -39,8 +41,15 @@ export default function DecisionPage() {
             </div>
             <span className="text-foreground font-semibold text-base sm:text-lg truncate">Shura</span>
           </div>
-          <div className="flex items-center gap-3 sm:gap-4 shrink-0">
+          <div className="flex items-center gap-2 sm:gap-4 shrink-0 flex-wrap justify-end">
             <span className="text-[10px] sm:text-xs text-muted-foreground hidden sm:inline">Decision Analysis</span>
+            <button
+              type="button"
+              onClick={() => setSpecialistModalOpen(true)}
+              className="text-xs font-medium text-primary hover:text-primary/80"
+            >
+              Request a specialist
+            </button>
             <a
               href="https://shura-gilt.vercel.app/#cta"
               target="_blank"
@@ -52,6 +61,11 @@ export default function DecisionPage() {
           </div>
         </div>
       </header>
+
+      <SpecialistRequestModal
+        open={specialistModalOpen}
+        onClose={() => setSpecialistModalOpen(false)}
+      />
 
       <DemoSection />
 

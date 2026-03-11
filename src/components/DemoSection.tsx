@@ -7,6 +7,7 @@ import { toast } from "@/components/ui/sonner";
 import { ChevronDown, ChevronRight, Lock, GitBranch, FileText, Download, Paperclip } from "lucide-react";
 import { exportAnalysisToPdf } from "@/lib/pdfExport";
 import { supabase } from "@/lib/supabase";
+import { getSessionId } from "@/lib/session";
 
 const DECISION_EXAMPLES = [
   "Should we hire a VP Sales at $2M ARR?",
@@ -17,20 +18,6 @@ const DECISION_EXAMPLES = [
 const ROLE_OPTIONS = ["", "Founder", "CEO", "Product", "Engineering", "Strategy", "Investor", "Other"];
 const COMPANY_STAGE_OPTIONS = ["", "Idea", "Pre-revenue", "<$1M ARR", "$1M–$5M ARR", "$5M–$20M ARR", "Enterprise"];
 const INDUSTRY_OPTIONS = ["", "SaaS", "AI", "Fintech", "Healthcare", "Marketplace", "E-commerce", "Other"];
-
-function getSessionId(): string {
-  const key = "aql_session_id";
-  let id = typeof localStorage !== "undefined" ? localStorage.getItem(key) : null;
-  if (!id) {
-    id = crypto.randomUUID?.() ?? `anon_${Date.now()}_${Math.random().toString(36).slice(2, 9)}`;
-    try {
-      localStorage.setItem(key, id);
-    } catch {
-      /* ignore */
-    }
-  }
-  return id;
-}
 
 async function fetchDecisionsCount(): Promise<number> {
   if (!supabase) return 0;
@@ -1073,7 +1060,7 @@ const DemoSection = () => {
                 Download PDF
               </Button>
               <Button variant="outline" size="sm" onClick={handleCopyLink} className="w-full sm:w-auto">
-                Copy share link
+                Share decision link with team
               </Button>
               <Button
                 variant="ghost"
@@ -1100,7 +1087,7 @@ const DemoSection = () => {
                 Save this analysis
               </p>
               <p className="text-xs text-white/60">
-                Use the share link above to send this analysis to others.
+                Share the decision link with your team to get their input.
               </p>
             </div>
           </div>
