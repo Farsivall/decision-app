@@ -18,7 +18,7 @@ const anthropic = new Anthropic({
   apiKey: process.env.ANTHROPIC_API_KEY || "",
 });
 
-const SYSTEM_PROMPT = `You are Shura, a strategic decision analysis engine. Given a decision title and description, produce a structured analysis as a single JSON object.
+const SYSTEM_PROMPT = `You are Shura, a strategic decision analysis engine. Given a decision title, context, and user profile (role, company stage, industry), produce a structured analysis as a single JSON object. Tailor your analysis to the user's role, company stage, and industry — use these to inform risk framing, relevant benchmarks, and recommended paths.
 
 Your output must include:
 
@@ -38,19 +38,38 @@ Output ONLY the JSON object. No markdown, no code fences, no explanation outside
 Tone: direct, specific, executive. Write for a busy founder/CEO. Challenge assumptions. Reference specific numbers, risks, and timeframes — not generics.`;
 
 app.post("/api/demo-analysis", async (req, res) => {
-  const { title, description } = req.body || {};
+  const { title, description, role, company_stage, industry } = req.body || {};
   const trimmedTitle = (title || "").trim();
   const trimmedDesc = (description || "").trim();
 
   if (!trimmedTitle) {
     return res.status(400).json({ detail: "Decision title is required." });
   }
+  if (!trimmedDesc) {
+    return res.status(400).json({ detail: "Context is required." });
+  }
+  if (!role) {
+    return res.status(400).json({ detail: "Role is required." });
+  }
+  if (!company_stage) {
+    return res.status(400).json({ detail: "Company stage is required." });
+  }
+  if (!industry) {
+    return res.status(400).json({ detail: "Industry is required." });
+  }
 
   if (!process.env.ANTHROPIC_API_KEY) {
     return res.status(503).json({ detail: "ANTHROPIC_API_KEY not set" });
   }
 
-  const userPrompt = `Decision: ${trimmedTitle}\n\nDescription: ${trimmedDesc || "(none provided)"}`;
+  const userPrompt = `Decision: ${trimmedTitle}
+
+Context: ${trimmedDesc}
+
+User profile (use this to tailor the analysis):
+- Role: ${role}
+- Company stage: ${company_stage}
+- Industry: ${industry}`;
 
   try {
     const resp = await anthropic.messages.create({

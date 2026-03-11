@@ -1,8 +1,30 @@
+import { useEffect, useState } from "react";
 import DemoSection from "@/components/DemoSection";
 import GradientBlobs from "@/components/GradientBlobs";
 import BackgroundCards from "@/components/BackgroundCards";
+import SharedAnalysisView from "@/components/SharedAnalysisView";
 
 export default function DecisionPage() {
+  const [shareId, setShareId] = useState<string | null>(null);
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const id = params.get("share");
+    setShareId(id);
+  }, []);
+
+  if (shareId) {
+    return (
+      <div className="min-h-screen bg-background relative">
+        <GradientBlobs />
+        <BackgroundCards />
+        <div className="relative z-10">
+          <SharedAnalysisView shareId={shareId} />
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-background relative overflow-x-hidden">
       <GradientBlobs />

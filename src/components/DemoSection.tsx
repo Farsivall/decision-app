@@ -1,11 +1,68 @@
-import { useRef, useState } from "react";
+import { useRef, useState, useEffect } from "react";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
+import { Select } from "@/components/ui/select";
 import { toast } from "@/components/ui/sonner";
 import { ChevronDown, ChevronRight, Lock, GitBranch, FileText, Download, Paperclip } from "lucide-react";
 import html2canvas from "html2canvas";
 import jsPDF from "jspdf";
+import { supabase } from "@/lib/supabase";
+
+const DECISION_EXAMPLES = [
+  "Should we hire a VP Sales at $2M ARR?",
+  "Should we expand to the US market next year?",
+  "Should we build AI features now or wait?",
+];
+
+const ROLE_OPTIONS = ["", "Founder", "CEO", "Product", "Engineering", "Strategy", "Investor", "Other"];
+const COMPANY_STAGE_OPTIONS = ["", "Idea", "Pre-revenue", "<$1M ARR", "$1M–$5M ARR", "$5M–$20M ARR", "Enterprise"];
+const INDUSTRY_OPTIONS = ["", "SaaS", "AI", "Fintech", "Healthcare", "Marketplace", "E-commerce", "Other"];
+
+function getSessionId(): string {
+  const key = "aql_session_id";
+  let id = typeof localStorage !== "undefined" ? localStorage.getItem(key) : null;
+  if (!id) {
+    id = crypto.randomUUID?.() ?? `anon_${Date.now()}_${Math.random().toString(36).slice(2, 9)}`;
+    try {
+      localStorage.setItem(key, id);
+    } catch {
+      /* ignore */
+    }
+  }
+  return id;
+}
+
+async function fetchDecisionsCount(): Promise<number> {
+  if (!supabase) return 0;
+  try {
+    const { count, error } = await supabase
+      .from("decisions")
+      .select("*", { count: "exact", head: true });
+    if (error) return 0;
+    return count ?? 0;
+  } catch {
+    return 0;
+  }
+}
+
+async function trackEvent(
+  eventName: string,
+  decisionId?: string,
+  payload?: Record<string, unknown>,
+) {
+  if (!supabase) return;
+  try {
+    await supabase.from("analytics_events").insert({
+      event_name: eventName,
+      decision_id: decisionId ?? null,
+      session_id: getSessionId(),
+      payload: payload ?? {},
+    });
+  } catch {
+    /* fire and forget */
+  }
+}
 
 // ─── Inline SectionLabel (self-contained, no external dependency) ────────────
 
@@ -41,7 +98,7 @@ interface DemoPath {
   favored_by: { persona: string }[];
 }
 
-interface DemoAnalysisResponse {
+export interface DemoAnalysisResponse {
   decision_title: string;
   decision_question: string;
   decision_summary: string;
@@ -125,12 +182,21 @@ const API_BASE = import.meta.env.VITE_DEMO_API_BASE || "";
 async function runDemoAnalysis(
   title: string,
   description: string,
+  role: string,
+  companyStage: string,
+  industry: string,
 ): Promise<DemoAnalysisResponse> {
   const base = (API_BASE || "http://127.0.0.1:3001").replace(/\/$/, "");
   const res = await fetch(`${base}/api/demo-analysis`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ title, description }),
+    body: JSON.stringify({
+      title,
+      description,
+      role,
+      company_stage: companyStage,
+      industry,
+    }),
   });
   if (!res.ok) {
     const err = await res.json().catch(() => ({}));
@@ -155,7 +221,7 @@ function PersonaChip({ name }: { name: string }) {
 
 // ─── Result Panel ────────────────────────────────────────────────────────────
 
-function ResultPanel({
+export function ResultPanel({
   result,
   panelRef,
 }: {
@@ -165,14 +231,14 @@ function ResultPanel({
   const totalScore = result.personas.reduce((s, p) => s + p.score, 0);
   const maxScore = result.personas.length * 100;
   const goThroughPct = maxScore > 0 ? Math.round((totalScore / maxScore) * 100) : 0;
-  const goThroughColor =
+  const { color: goThroughColor, label: goThroughLabel } =
     goThroughPct >= 80
-      ? "text-emerald-500"
+      ? { color: "text-emerald-500", label: "Strong recommendation" }
       : goThroughPct >= 60
-        ? "text-emerald-400"
+        ? { color: "text-emerald-400", label: "Proceed cautiously" }
         : goThroughPct >= 40
-          ? "text-amber-400"
-          : "text-red-400";
+          ? { color: "text-red-300", label: "Less likely to proceed — need more evidence" }
+          : { color: "text-red-400", label: "Do not proceed" };
   const [expandedPersonas, setExpandedPersonas] = useState<
     Record<string, boolean>
   >({});
@@ -199,8 +265,8 @@ function ResultPanel({
           </span>
         </div>
         <div className="flex items-center gap-2 shrink-0">
-          <span className="text-[11px] font-medium text-white/50 uppercase tracking-wider">
-            Go through
+          <span className={`text-[11px] font-medium uppercase tracking-wider ${goThroughColor}`}>
+            {goThroughLabel}
           </span>
           <span className={`text-2xl font-bold tabular-nums ${goThroughColor}`}>
             {goThroughPct}%
@@ -547,27 +613,91 @@ function ResultPanel({
 // ─── Main Component ──────────────────────────────────────────────────────────
 
 const DemoSection = () => {
-  const [title, setTitle] = useState("");
-  const [description, setDescription] = useState("");
+  const [decision, setDecision] = useState("");
+  const [context, setContext] = useState("");
+  const [role, setRole] = useState("");
+  const [companyStage, setCompanyStage] = useState("");
+  const [industry, setIndustry] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [result, setResult] = useState<DemoAnalysisResponse | null>(null);
+  const [decisionId, setDecisionId] = useState<string | null>(null);
+  const [email, setEmail] = useState("");
+  const [decisionsCount, setDecisionsCount] = useState(0);
   const resultRef = useRef<HTMLDivElement | null>(null);
+
+  useEffect(() => {
+    fetchDecisionsCount().then(setDecisionsCount);
+  }, []);
+
+  const incrementDecisionsCount = () => {
+    setDecisionsCount((c) => c + 1);
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
 
-    const trimmed = title.trim();
+    const trimmed = decision.trim();
+    const trimmedContext = context.trim();
     if (!trimmed) {
       setError("Please enter a decision to evaluate.");
       return;
     }
+    if (!trimmedContext) {
+      setError("Please provide context.");
+      return;
+    }
+    if (!role) {
+      setError("Please select your role.");
+      return;
+    }
+    if (!companyStage) {
+      setError("Please select company stage.");
+      return;
+    }
+    if (!industry) {
+      setError("Please select industry.");
+      return;
+    }
 
     setLoading(true);
+    let id: string | null = null;
+
     try {
-      const data = await runDemoAnalysis(trimmed, description.trim());
+      if (supabase) {
+        const { data: row, error: insertErr } = await supabase
+          .from("decisions")
+          .insert({
+            decision: trimmed,
+            context: trimmedContext,
+            role,
+            company_stage: companyStage,
+            industry,
+            email: email.trim() || null,
+            session_id: getSessionId(),
+          })
+          .select("id")
+          .single();
+        if (!insertErr && row) {
+          id = row.id;
+          setDecisionId(id);
+          incrementDecisionsCount();
+          await trackEvent("decision_created", id);
+          if (email.trim()) await trackEvent("email_capture_submitted", id, { email: email.trim() });
+        }
+      }
+
+      const data = await runDemoAnalysis(trimmed, trimmedContext, role, companyStage, industry);
       setResult(data);
+
+      if (supabase && id) {
+        await supabase
+          .from("decisions")
+          .update({ analysis_result: data })
+          .eq("id", id);
+        await trackEvent("analysis_completed", id);
+      }
     } catch (err) {
       setError(
         err instanceof Error
@@ -645,8 +775,12 @@ const DemoSection = () => {
 
   const handleCopyLink = async () => {
     try {
-      await navigator.clipboard.writeText(window.location.href);
-      toast.success("Link copied to clipboard.");
+      const shareUrl = decisionId
+        ? `${window.location.origin}${window.location.pathname}?share=${decisionId}`
+        : window.location.href;
+      await navigator.clipboard.writeText(shareUrl);
+      if (decisionId) await trackEvent("analysis_shared", decisionId);
+      toast.success("Share link copied to clipboard.");
     } catch {
       toast.error("Unable to copy link.");
     }
@@ -657,7 +791,19 @@ const DemoSection = () => {
       id="demo"
       className="py-16 sm:py-20 md:py-24 relative z-10"
     >
-      <div className="container max-w-5xl">
+      <div className="container max-w-5xl relative">
+        {/* Decisions made — top right */}
+        <div className="absolute top-0 right-0">
+          <div className="flex flex-col items-center justify-center rounded-full bg-emerald-600 border-2 border-emerald-500/50 shadow-lg shadow-emerald-900/50 w-24 h-24 sm:w-28 sm:h-28 p-3">
+            <span className="text-2xl sm:text-3xl font-bold text-white leading-none tabular-nums">
+              {decisionsCount.toLocaleString()}
+            </span>
+            <span className="text-[10px] sm:text-xs font-bold text-white uppercase tracking-wider mt-1 text-center leading-tight">
+              decisions made
+            </span>
+          </div>
+        </div>
+
         {/* Heading */}
         <div className="max-w-2xl mx-auto text-center mb-10">
           <SectionLabel>Decision Analysis</SectionLabel>
@@ -673,44 +819,116 @@ const DemoSection = () => {
         {/* Form */}
         <form
           onSubmit={handleSubmit}
-          className="max-w-2xl mx-auto space-y-4 mb-12"
+          className="max-w-2xl mx-auto space-y-6 mb-12"
         >
           <div className="space-y-2">
             <label
-              htmlFor="demo-title"
-              className="text-xs font-medium text-muted-foreground"
+              htmlFor="demo-email"
+              className="block text-sm font-medium text-muted-foreground"
             >
-              Decision title
+              Email <span className="text-muted-foreground/60">(optional)</span>
             </label>
             <Input
-              id="demo-title"
-              placeholder="Expand into European market"
-              value={title}
-              onChange={(e) => setTitle(e.target.value)}
+              id="demo-email"
+              type="email"
+              placeholder="your@email.com"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
               disabled={loading}
-              className="bg-background"
             />
           </div>
           <div className="space-y-2">
             <label
-              htmlFor="demo-desc"
-              className="text-xs font-medium text-muted-foreground"
+              htmlFor="demo-decision"
+              className="block text-sm font-medium text-muted-foreground"
             >
-              Context
+              Decision <span className="text-destructive">*</span>
             </label>
             <Textarea
-              id="demo-desc"
-              placeholder="B2B SaaS company, $5M ARR, 50 employees, US-only. Considering EU expansion but concerned about runway and regulatory complexity."
-              maxLength={600}
-              value={description}
-              onChange={(e) => setDescription(e.target.value)}
+              id="demo-decision"
+              placeholder="e.g. Should we hire a VP Sales at $2M ARR?"
+              maxLength={500}
+              value={decision}
+              onChange={(e) => setDecision(e.target.value)}
               disabled={loading}
-              className="bg-background text-sm"
               rows={3}
             />
-            <p className="text-[10px] text-muted-foreground/80 text-right">
-              {description.length}/600
+            <p className="text-xs text-muted-foreground/70">
+              Examples:{" "}
+              {DECISION_EXAMPLES.map((ex, i) => (
+                <button
+                  key={i}
+                  type="button"
+                  onClick={() => setDecision(ex)}
+                  className="underline hover:text-foreground/90 mr-1"
+                >
+                  {ex}
+                </button>
+              ))}
             </p>
+          </div>
+          <div className="space-y-4 rounded-xl bg-muted/20 p-5">
+            <label className="block text-sm font-medium text-muted-foreground">
+              Context <span className="text-destructive">*</span>
+            </label>
+            <div className="flex flex-wrap items-center gap-2 text-sm">
+              <span className="text-muted-foreground/80">I&apos;m a</span>
+              <Select
+                id="demo-role"
+                value={role}
+                onChange={(e) => setRole(e.target.value)}
+                disabled={loading}
+                className="h-11 w-auto min-w-[140px] sm:min-w-[155px] flex-shrink-0"
+              >
+                {ROLE_OPTIONS.map((opt) => (
+                  <option key={opt || "empty"} value={opt}>
+                    {opt || "Role"}
+                  </option>
+                ))}
+              </Select>
+              <span className="text-muted-foreground/80">at a</span>
+              <Select
+                id="demo-stage"
+                value={companyStage}
+                onChange={(e) => setCompanyStage(e.target.value)}
+                disabled={loading}
+                className="h-11 w-auto min-w-[145px] sm:min-w-[165px] flex-shrink-0"
+              >
+                {COMPANY_STAGE_OPTIONS.map((opt) => (
+                  <option key={opt || "empty"} value={opt}>
+                    {opt || "Stage"}
+                  </option>
+                ))}
+              </Select>
+              <Select
+                id="demo-industry"
+                value={industry}
+                onChange={(e) => setIndustry(e.target.value)}
+                disabled={loading}
+                className="h-11 w-auto min-w-[130px] sm:min-w-[145px] flex-shrink-0"
+              >
+                {INDUSTRY_OPTIONS.map((opt) => (
+                  <option key={opt || "empty"} value={opt}>
+                    {opt || "Industry"}
+                  </option>
+                ))}
+              </Select>
+              <span className="text-muted-foreground/80">company.</span>
+            </div>
+            <div className="space-y-1">
+              <Textarea
+                id="demo-context"
+                placeholder="e.g. $5M ARR, 50 employees. Considering EU expansion but concerned about runway and regulatory complexity."
+                maxLength={600}
+                value={context}
+                onChange={(e) => setContext(e.target.value)}
+                disabled={loading}
+                rows={3}
+              />
+              <p className="text-right text-xs text-muted-foreground/80">
+                {context.length}/600
+              </p>
+            </div>
           </div>
 
           {/* Locked document upload teaser */}
@@ -728,15 +946,16 @@ const DemoSection = () => {
           </div>
 
           {error && <p className="text-xs text-destructive">{error}</p>}
-          <Button
-            type="submit"
-            variant="hero-secondary"
-            size="xl"
-            disabled={loading}
-            className="w-full sm:w-auto"
-          >
-            {loading ? "Analyzing…" : "Run demo analysis"}
-          </Button>
+          <div className="flex justify-center">
+            <Button
+              type="submit"
+              size="xl"
+              disabled={loading}
+              className="w-full sm:w-auto bg-emerald-600 hover:bg-emerald-500 text-white font-semibold shadow-lg shadow-emerald-500/25 hover:scale-[1.02]"
+            >
+              {loading ? "Analyzing…" : "Run demo analysis"}
+            </Button>
+          </div>
         </form>
 
         {/* Loading skeleton */}
@@ -780,12 +999,27 @@ const DemoSection = () => {
                 size="sm"
                 onClick={() => {
                   setResult(null);
-                  setTitle("");
-                  setDescription("");
+                  setDecision("");
+                  setContext("");
+                  setRole("");
+                  setCompanyStage("");
+                  setIndustry("");
+                  setDecisionId(null);
+                  setEmail("");
                 }}
               >
                 Try another decision
               </Button>
+            </div>
+
+            {/* Post-analysis CTA: save / share */}
+            <div className="rounded-xl border border-white/10 bg-white/[0.02] p-5 mt-6">
+              <p className="text-sm font-medium text-white/90 mb-2">
+                Save this analysis
+              </p>
+              <p className="text-xs text-white/60">
+                Use the share link above to send this analysis to others.
+              </p>
             </div>
           </div>
         )}
