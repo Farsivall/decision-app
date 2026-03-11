@@ -5,8 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Select } from "@/components/ui/select";
 import { toast } from "@/components/ui/sonner";
 import { ChevronDown, ChevronRight, Lock, GitBranch, FileText, Download, Paperclip } from "lucide-react";
-import html2canvas from "html2canvas";
-import jsPDF from "jspdf";
+import { exportAnalysisToPdf } from "@/lib/pdfExport";
 import { supabase } from "@/lib/supabase";
 
 const DECISION_EXAMPLES = [
@@ -712,61 +711,10 @@ const DemoSection = () => {
 
   const handleDownloadPdf = async () => {
     if (!resultRef.current) return;
-    const el = resultRef.current;
     try {
       toast.info("Generating PDF…");
-      // Capture full element size to avoid side clipping
-      const captureWidth = Math.max(el.offsetWidth, el.scrollWidth);
-      const captureHeight = Math.max(el.offsetHeight, el.scrollHeight);
-      const canvas = await html2canvas(el, {
-        scale: 2,
-        useCORS: true,
-        backgroundColor: "#1e1e2e",
-        ignoreElements: (node) => (node as Element).classList?.contains("no-pdf"),
-        width: captureWidth,
-        height: captureHeight,
-        windowWidth: captureWidth,
-        windowHeight: captureHeight,
-        scrollX: 0,
-        scrollY: 0,
-      });
-      const imgData = canvas.toDataURL("image/png");
-      const pdf = new jsPDF("p", "mm", "a4");
-      const pageWidth = pdf.internal.pageSize.getWidth();
-      const pageHeight = pdf.internal.pageSize.getHeight();
-      const margin = 12;
-      const usableWidth = pageWidth - margin * 2;
-      const usableHeight = pageHeight - margin * 2;
-      const imgProps = pdf.getImageProperties(imgData);
-      const imgHeight = (imgProps.height * usableWidth) / imgProps.width;
-
-      if (imgHeight <= usableHeight) {
-        pdf.addImage(imgData, "PNG", margin, margin, usableWidth, imgHeight);
-      } else {
-        const pageCanvas = document.createElement("canvas");
-        const ctx = pageCanvas.getContext("2d")!;
-        const scaledPageH = (usableHeight / usableWidth) * canvas.width;
-        pageCanvas.width = canvas.width;
-        let srcY = 0;
-        let page = 0;
-        while (srcY < canvas.height) {
-          const remaining = canvas.height - srcY;
-          const sliceH = Math.min(Math.ceil(scaledPageH), Math.ceil(remaining));
-          if (sliceH <= 0) break;
-          pageCanvas.height = sliceH;
-          ctx.clearRect(0, 0, pageCanvas.width, pageCanvas.height);
-          ctx.drawImage(canvas, 0, srcY, canvas.width, sliceH, 0, 0, canvas.width, sliceH);
-          const sliceData = pageCanvas.toDataURL("image/png");
-          const sliceImgH = (sliceH * usableWidth) / canvas.width;
-          if (page > 0) pdf.addPage();
-          pdf.addImage(sliceData, "PNG", margin, margin, usableWidth, sliceImgH);
-          srcY += sliceH;
-          page++;
-        }
-      }
-
       const fileName = `shura-brief-${(result?.decision_title || "decision").replace(/\s+/g, "-").toLowerCase().slice(0, 40)}.pdf`;
-      pdf.save(fileName);
+      await exportAnalysisToPdf(resultRef.current, fileName);
       toast.success("PDF downloaded.");
     } catch {
       toast.error("Unable to generate PDF. Please try again.");
@@ -794,11 +742,11 @@ const DemoSection = () => {
       <div className="container max-w-5xl relative">
         {/* Decisions made — top right */}
         <div className="absolute top-0 right-0">
-          <div className="flex flex-col items-center justify-center rounded-full bg-emerald-600 border-2 border-emerald-500/50 shadow-lg shadow-emerald-900/50 w-24 h-24 sm:w-28 sm:h-28 p-3">
-            <span className="text-2xl sm:text-3xl font-bold text-white leading-none tabular-nums">
+          <div className="flex flex-col items-center justify-center rounded-full bg-emerald-600 border-2 border-emerald-500/50 shadow-lg shadow-emerald-900/50 w-14 h-14 sm:w-20 sm:h-20 md:w-24 md:h-24 lg:w-28 lg:h-28 p-1.5 sm:p-2 md:p-3">
+            <span className="text-base sm:text-xl md:text-2xl lg:text-3xl font-bold text-white leading-none tabular-nums">
               {decisionsCount.toLocaleString()}
             </span>
-            <span className="text-[10px] sm:text-xs font-bold text-white uppercase tracking-wider mt-1 text-center leading-tight">
+            <span className="text-[8px] sm:text-[9px] md:text-[10px] lg:text-xs font-bold text-white uppercase tracking-wider mt-0.5 sm:mt-1 text-center leading-tight">
               decisions made
             </span>
           </div>

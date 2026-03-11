@@ -3,7 +3,8 @@ import { ResultPanel } from "@/components/DemoSection";
 import type { DemoAnalysisResponse } from "@/components/DemoSection";
 import { supabase } from "@/lib/supabase";
 import { Button } from "@/components/ui/button";
-import { ArrowLeft } from "lucide-react";
+import { exportAnalysisToPdf } from "@/lib/pdfExport";
+import { ArrowLeft, Download } from "lucide-react";
 
 export default function SharedAnalysisView({ shareId }: { shareId: string }) {
   const [result, setResult] = useState<DemoAnalysisResponse | null>(null);
@@ -54,16 +55,32 @@ export default function SharedAnalysisView({ shareId }: { shareId: string }) {
     );
   }
 
+  const handleDownloadPdf = async () => {
+    if (!panelRef.current) return;
+    try {
+      const fileName = `shura-brief-${(result.decision_title || "decision").replace(/\s+/g, "-").toLowerCase().slice(0, 40)}.pdf`;
+      await exportAnalysisToPdf(panelRef.current, fileName);
+    } catch {
+      // Silent fail or could add toast
+    }
+  };
+
   return (
     <div className="min-h-screen bg-background py-8 px-4">
       <div className="max-w-4xl mx-auto">
-        <a
-          href="/"
-          className="inline-flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground mb-6"
-        >
-          <ArrowLeft className="w-4 h-4" />
-          Back to Shura
-        </a>
+        <div className="flex items-center justify-between gap-4 mb-6">
+          <a
+            href="/"
+            className="inline-flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground"
+          >
+            <ArrowLeft className="w-4 h-4" />
+            Back to Shura
+          </a>
+          <Button variant="secondary" size="sm" onClick={handleDownloadPdf}>
+            <Download className="w-3.5 h-3.5 mr-1.5" />
+            Download PDF
+          </Button>
+        </div>
         <ResultPanel result={result} panelRef={panelRef} />
       </div>
     </div>
