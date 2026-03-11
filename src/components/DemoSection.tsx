@@ -890,13 +890,13 @@ const DemoSection = () => {
       className="py-16 sm:py-20 md:py-24 relative z-10"
     >
       <div className="container max-w-5xl relative">
-        {/* Decisions made — top right */}
-        <div className="absolute top-0 right-0">
-          <div className="flex flex-col items-center justify-center rounded-full bg-emerald-600 border-2 border-emerald-500/50 shadow-lg shadow-emerald-900/50 w-14 h-14 sm:w-20 sm:h-20 md:w-24 md:h-24 lg:w-28 lg:h-28 p-1.5 sm:p-2 md:p-3">
-            <span className="text-base sm:text-xl md:text-2xl lg:text-3xl font-bold text-white leading-none tabular-nums">
+        {/* Decisions made — top right, fixed on mobile to avoid covering content */}
+        <div className="fixed top-14 right-4 z-50 sm:absolute sm:top-0 sm:right-0 sm:z-auto">
+          <div className="flex flex-col items-center justify-center rounded-full bg-emerald-600 border-2 border-emerald-500/50 shadow-lg shadow-emerald-900/50 w-12 h-12 sm:w-20 sm:h-20 md:w-24 md:h-24 lg:w-28 lg:h-28 p-1 sm:p-2 md:p-3">
+            <span className="text-xs sm:text-xl md:text-2xl lg:text-3xl font-bold text-white leading-none tabular-nums">
               {decisionsCount.toLocaleString()}
             </span>
-            <span className="text-[8px] sm:text-[9px] md:text-[10px] lg:text-xs font-bold text-white uppercase tracking-wider mt-0.5 sm:mt-1 text-center leading-tight">
+            <span className="text-[7px] sm:text-[9px] md:text-[10px] lg:text-xs font-bold text-white uppercase tracking-wider mt-0.5 sm:mt-1 text-center leading-tight">
               decisions made
             </span>
           </div>
