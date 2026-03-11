@@ -2,19 +2,9 @@ import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import { Select } from "@/components/ui/select";
 import { supabase } from "@/lib/supabase";
 import { getSessionId } from "@/lib/session";
 import { X } from "lucide-react";
-
-const SPECIALIST_TYPES = [
-  "Legal",
-  "Financial",
-  "Technical",
-  "Business Development",
-  "Tax",
-  "Other",
-];
 
 interface SpecialistRequestModalProps {
   open: boolean;
@@ -114,20 +104,15 @@ export function SpecialistRequestModal({
               >
                 Specialist type
               </label>
-              <Select
+              <Input
                 id="specialist-type"
+                type="text"
+                placeholder="e.g. Legal, Financial, Technical..."
                 value={specialistType}
                 onChange={(e) => setSpecialistType(e.target.value)}
                 disabled={submitting}
-                className="h-10 w-full bg-white/5 border-white/10"
-              >
-                <option value="">Select...</option>
-                {SPECIALIST_TYPES.map((t) => (
-                  <option key={t} value={t}>
-                    {t}
-                  </option>
-                ))}
-              </Select>
+                className="bg-white/5 border-white/10"
+              />
             </div>
             <div>
               <label
