@@ -273,9 +273,11 @@ function PersonaChip({ name }: { name: string }) {
 export function ResultPanel({
   result,
   panelRef,
+  decisionId,
 }: {
   result: DemoAnalysisResponse;
   panelRef: React.RefObject<HTMLDivElement | null>;
+  decisionId?: string | null;
 }) {
   const totalScore = result.personas.reduce((s, p) => s + p.score, 0);
   const maxScore = result.personas.length * 100;
@@ -291,11 +293,31 @@ export function ResultPanel({
   const [expandedPersonas, setExpandedPersonas] = useState<
     Record<string, boolean>
   >({});
+  const [usefulness, setUsefulness] = useState(50);
+  const [comments, setComments] = useState("");
+  const [feedbackSubmitted, setFeedbackSubmitted] = useState(false);
+  const [feedbackSaving, setFeedbackSaving] = useState(false);
 
   const agreementItems = splitParagraph(result.agreement || "");
 
   const togglePersona = (name: string) => {
     setExpandedPersonas((prev) => ({ ...prev, [name]: !prev[name] }));
+  };
+
+  const handleFeedbackSubmit = async () => {
+    if (!decisionId || !supabase || feedbackSubmitted) return;
+    setFeedbackSaving(true);
+    try {
+      const { error } = await supabase.from("analysis_feedback").insert({
+        decision_id: decisionId,
+        session_id: getSessionId(),
+        usefulness_score: usefulness,
+        comments: comments.trim() || null,
+      });
+      if (!error) setFeedbackSubmitted(true);
+    } finally {
+      setFeedbackSaving(false);
+    }
   };
 
   return (
@@ -654,6 +676,52 @@ export function ResultPanel({
             </a>
           </div>
         </section>
+
+        {/* Section 10 — Feedback */}
+        {decisionId && (
+          <section className="rounded-lg sm:rounded-xl border border-white/10 bg-white/[0.02] p-4 sm:p-5 no-pdf">
+            <p className="text-[10px] sm:text-[11px] font-medium text-white/50 uppercase tracking-wider mb-3">
+              How useful was this analysis?
+            </p>
+            {feedbackSubmitted ? (
+              <p className="text-sm text-emerald-400">Thanks for your feedback.</p>
+            ) : (
+              <>
+                <div className="flex items-center gap-3 mb-4">
+                  <input
+                    type="range"
+                    min={0}
+                    max={100}
+                    value={usefulness}
+                    onChange={(e) => setUsefulness(Number(e.target.value))}
+                    className="flex-1 h-2 rounded-full appearance-none bg-white/10 accent-emerald-500"
+                  />
+                  <span className="text-sm font-medium text-white tabular-nums w-10">
+                    {usefulness}%
+                  </span>
+                </div>
+                <Textarea
+                  placeholder="Any additional comments? (optional)"
+                  value={comments}
+                  onChange={(e) => setComments(e.target.value)}
+                  disabled={feedbackSaving}
+                  rows={2}
+                  className="mb-3 bg-white/5 border-white/10 text-sm resize-none"
+                />
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="secondary"
+                  onClick={handleFeedbackSubmit}
+                  disabled={feedbackSaving}
+                  className="bg-emerald-600/20 text-emerald-400 hover:bg-emerald-600/30"
+                >
+                  {feedbackSaving ? "Saving…" : "Submit feedback"}
+                </Button>
+              </>
+            )}
+          </section>
+        )}
       </div>
     </div>
   );
@@ -964,7 +1032,7 @@ const DemoSection = () => {
         {/* Result */}
         {!loading && result && (
           <div className="max-w-4xl mx-auto space-y-4 px-2 sm:px-0">
-            <ResultPanel result={result} panelRef={resultRef} />
+            <ResultPanel result={result} panelRef={resultRef} decisionId={decisionId} />
 
             {/* Action buttons */}
             <div className="flex flex-col sm:flex-row flex-wrap gap-2 sm:gap-3 justify-center items-stretch sm:items-center">

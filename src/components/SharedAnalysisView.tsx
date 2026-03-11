@@ -81,7 +81,7 @@ export default function SharedAnalysisView({ shareId }: { shareId: string }) {
             Download PDF
           </Button>
         </div>
-        <ResultPanel result={result} panelRef={panelRef} />
+        <ResultPanel result={result} panelRef={panelRef} decisionId={shareId} />
       </div>
     </div>
   );
