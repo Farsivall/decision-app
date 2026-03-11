@@ -76,10 +76,20 @@ export default function SharedAnalysisView({ shareId }: { shareId: string }) {
             <ArrowLeft className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
             Back to Shura
           </a>
-          <Button variant="secondary" size="sm" onClick={handleDownloadPdf} className="w-full sm:w-auto">
-            <Download className="w-3.5 h-3.5 mr-1.5" />
-            Download PDF
-          </Button>
+          <div className="flex flex-wrap items-center gap-2 sm:gap-3">
+            <a
+              href="https://shura-gilt.vercel.app/#cta"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-xs font-medium text-primary hover:text-primary/80"
+            >
+              Sign up for waitlist
+            </a>
+            <Button variant="secondary" size="sm" onClick={handleDownloadPdf} className="w-full sm:w-auto">
+              <Download className="w-3.5 h-3.5 mr-1.5" />
+              Download PDF
+            </Button>
+          </div>
         </div>
         <ResultPanel result={result} panelRef={panelRef} decisionId={shareId} />
       </div>

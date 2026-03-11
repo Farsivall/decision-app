@@ -92,7 +92,7 @@ function LoadingAnalysis() {
           {LOADING_MESSAGES[messageIndex]}
         </p>
         <p className="text-xs text-white/50">
-          This may take 15–30 seconds
+          This may take 30–45 seconds
         </p>
         <div className="mt-6 flex justify-center gap-1">
           {LOADING_MESSAGES.map((_, i) => (
@@ -308,13 +308,24 @@ export function ResultPanel({
     if (!decisionId || !supabase || feedbackSubmitted) return;
     setFeedbackSaving(true);
     try {
-      const { error } = await supabase.from("analysis_feedback").insert({
+      const feedbackPayload = {
         decision_id: decisionId,
         session_id: getSessionId(),
         usefulness_score: usefulness,
         comments: comments.trim() || null,
-      });
-      if (!error) setFeedbackSubmitted(true);
+      };
+      const [{ error: feedbackErr }, { error: decisionErr }] = await Promise.all([
+        supabase.from("analysis_feedback").insert(feedbackPayload),
+        supabase
+          .from("decisions")
+          .update({
+            feedback_usefulness_score: usefulness,
+            feedback_comments: comments.trim() || null,
+            feedback_submitted_at: new Date().toISOString(),
+          })
+          .eq("id", decisionId),
+      ]);
+      if (!feedbackErr && !decisionErr) setFeedbackSubmitted(true);
     } finally {
       setFeedbackSaving(false);
     }
@@ -612,7 +623,9 @@ export function ResultPanel({
                           </span>
                         </div>
                         <a
-                          href="#cta"
+                          href="https://shura-gilt.vercel.app/#cta"
+                          target="_blank"
+                          rel="noopener noreferrer"
                           className="text-xs font-medium px-3 py-1.5 rounded-md bg-white/10 text-white/80 hover:bg-white/15 hover:text-white transition-colors"
                         >
                           Join waitlist
@@ -669,7 +682,9 @@ export function ResultPanel({
               trade-off visualisation.
             </p>
             <a
-              href="#cta"
+              href="https://shura-gilt.vercel.app/#cta"
+              target="_blank"
+              rel="noopener noreferrer"
               className="mt-1 inline-flex items-center gap-1.5 text-xs font-medium px-4 py-2 rounded-lg bg-emerald-600/20 text-emerald-400 hover:bg-emerald-600/30 transition-colors"
             >
               Get full access
@@ -722,6 +737,23 @@ export function ResultPanel({
             )}
           </section>
         )}
+
+        {/* Section 11 — Sign up for waitlist */}
+        <section className="rounded-lg sm:rounded-xl border border-emerald-500/30 bg-emerald-950/20 p-4 sm:p-5 no-pdf">
+          <a
+            href="https://shura-gilt.vercel.app/#cta"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="flex flex-col sm:flex-row items-center justify-center gap-2 sm:gap-3 text-center group"
+          >
+            <span className="text-sm font-semibold text-emerald-400 group-hover:text-emerald-300">
+              Sign up for waitlist
+            </span>
+            <span className="text-xs text-white/60">
+              Get full access to Shura →
+            </span>
+          </a>
+        </section>
       </div>
     </div>
   );

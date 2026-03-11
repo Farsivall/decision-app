@@ -39,7 +39,17 @@ export default function DecisionPage() {
             </div>
             <span className="text-foreground font-semibold text-base sm:text-lg truncate">Shura</span>
           </div>
-          <span className="text-[10px] sm:text-xs text-muted-foreground shrink-0 hidden sm:inline">Decision Analysis</span>
+          <div className="flex items-center gap-3 sm:gap-4 shrink-0">
+            <span className="text-[10px] sm:text-xs text-muted-foreground hidden sm:inline">Decision Analysis</span>
+            <a
+              href="https://shura-gilt.vercel.app/#cta"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-xs font-medium text-primary hover:text-primary/80"
+            >
+              Sign up for waitlist
+            </a>
+          </div>
         </div>
       </header>
 
