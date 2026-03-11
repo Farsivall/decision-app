@@ -1,0 +1,797 @@
+import { useRef, useState } from "react";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
+import { Button } from "@/components/ui/button";
+import { toast } from "@/components/ui/sonner";
+import { ChevronDown, ChevronRight, Lock, GitBranch, FileText, Download, Paperclip } from "lucide-react";
+import html2canvas from "html2canvas";
+import jsPDF from "jspdf";
+
+// ─── Inline SectionLabel (self-contained, no external dependency) ────────────
+
+const SectionLabel = ({ children }: { children: React.ReactNode }) => (
+  <span className="inline-block text-xs font-medium text-primary tracking-widest uppercase mb-4">{children}</span>
+);
+
+// ─── Types ───────────────────────────────────────────────────────────────────
+
+interface DemoPersona {
+  name: string;
+  score: number;
+}
+
+interface DemoCoreTension {
+  title: string;
+  explanation: string;
+  raised_by?: string;
+}
+
+interface DemoTradeoff {
+  persona_a: string;
+  score_a: number;
+  persona_b: string;
+  score_b: number;
+  explanation: string;
+}
+
+interface DemoPath {
+  id: string;
+  title: string;
+  description: string;
+  favored_by: { persona: string }[];
+}
+
+interface DemoAnalysisResponse {
+  decision_title: string;
+  decision_question: string;
+  decision_summary: string;
+  personas: DemoPersona[];
+  core_tensions: DemoCoreTension[];
+  agreement: string;
+  tradeoffs: DemoTradeoff[];
+  recommended_path: { title: string; why_best: string };
+  paths: DemoPath[];
+  next_steps: string[];
+  sources?: string[];
+}
+
+// ─── Persona Colors ──────────────────────────────────────────────────────────
+
+const PERSONA_COLORS: Record<string, string> = {
+  Legal: "#6366f1",
+  Financial: "#22c55e",
+  Technical: "#0ea5e9",
+  "Business Development": "#f59e0b",
+  "Business Dev": "#f59e0b",
+  Tax: "#a855f7",
+};
+
+function getPersonaColor(name: string): string {
+  return PERSONA_COLORS[name] ?? "#6b7280";
+}
+
+// ─── Color-Coded Persona Names in Text ───────────────────────────────────────
+
+const COLOR_TOKENS = Object.keys(PERSONA_COLORS).sort(
+  (a, b) => b.length - a.length,
+);
+
+function ColorCodedText({ text }: { text: string }) {
+  const parts: { str: string; color?: string }[] = [];
+  let remaining = text;
+  while (remaining.length > 0) {
+    let best: { token: string; index: number } | null = null;
+    for (const token of COLOR_TOKENS) {
+      const i = remaining.indexOf(token);
+      if (i !== -1 && (!best || i < best.index)) best = { token, index: i };
+    }
+    if (!best) {
+      parts.push({ str: remaining });
+      break;
+    }
+    if (best.index > 0) parts.push({ str: remaining.slice(0, best.index) });
+    parts.push({ str: best.token, color: PERSONA_COLORS[best.token] });
+    remaining = remaining.slice(best.index + best.token.length);
+  }
+  return (
+    <span>
+      {parts.map((p, i) =>
+        p.color ? (
+          <span key={i} className="font-medium" style={{ color: p.color }}>
+            {p.str}
+          </span>
+        ) : (
+          <span key={i}>{p.str}</span>
+        ),
+      )}
+    </span>
+  );
+}
+
+// ─── Split agreement text into bullet items ──────────────────────────────────
+
+function splitParagraph(text: string): string[] {
+  return text
+    .split(/(?<=\.)\s+/)
+    .map((s) => s.trim())
+    .filter(Boolean)
+    .slice(0, 4);
+}
+
+// ─── API ─────────────────────────────────────────────────────────────────────
+
+const API_BASE = import.meta.env.VITE_DEMO_API_BASE || "";
+
+async function runDemoAnalysis(
+  title: string,
+  description: string,
+): Promise<DemoAnalysisResponse> {
+  const base = (API_BASE || "http://127.0.0.1:3001").replace(/\/$/, "");
+  const res = await fetch(`${base}/api/demo-analysis`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ title, description }),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.detail ?? "Analysis failed");
+  }
+  return res.json();
+}
+
+// ─── Persona Chip ────────────────────────────────────────────────────────────
+
+function PersonaChip({ name }: { name: string }) {
+  const color = getPersonaColor(name);
+  return (
+    <span
+      className="px-1.5 py-0.5 rounded font-medium text-[11px] inline-flex items-center"
+      style={{ color, backgroundColor: color + "20" }}
+    >
+      {name}
+    </span>
+  );
+}
+
+// ─── Result Panel ────────────────────────────────────────────────────────────
+
+function ResultPanel({
+  result,
+  panelRef,
+}: {
+  result: DemoAnalysisResponse;
+  panelRef: React.RefObject<HTMLDivElement | null>;
+}) {
+  const totalScore = result.personas.reduce((s, p) => s + p.score, 0);
+  const maxScore = result.personas.length * 100;
+  const goThroughPct = maxScore > 0 ? Math.round((totalScore / maxScore) * 100) : 0;
+  const goThroughColor =
+    goThroughPct >= 80
+      ? "text-emerald-500"
+      : goThroughPct >= 60
+        ? "text-emerald-400"
+        : goThroughPct >= 40
+          ? "text-amber-400"
+          : "text-red-400";
+  const [expandedPersonas, setExpandedPersonas] = useState<
+    Record<string, boolean>
+  >({});
+
+  const agreementItems = splitParagraph(result.agreement || "");
+
+  const togglePersona = (name: string) => {
+    setExpandedPersonas((prev) => ({ ...prev, [name]: !prev[name] }));
+  };
+
+  return (
+    <div
+      ref={panelRef}
+      className="bg-[#1e1e2e] border border-white/10 rounded-2xl shadow-2xl max-w-4xl w-full"
+    >
+      {/* Header Bar */}
+      <div className="flex flex-wrap items-center justify-between gap-3 px-6 pt-5 pb-4 border-b border-white/10">
+        <div className="flex flex-wrap items-center gap-3 min-w-0">
+          <h2 className="text-base font-semibold text-white shrink-0">
+            Decision breakdown
+          </h2>
+          <span className="text-sm text-white/70 font-medium whitespace-nowrap shrink-0">
+            Total: {totalScore} / {maxScore}
+          </span>
+        </div>
+        <div className="flex items-center gap-2 shrink-0">
+          <span className="text-[11px] font-medium text-white/50 uppercase tracking-wider">
+            Go through
+          </span>
+          <span className={`text-2xl font-bold tabular-nums ${goThroughColor}`}>
+            {goThroughPct}%
+          </span>
+        </div>
+      </div>
+
+      {/* Body */}
+      <div className="p-6 space-y-8">
+        {/* Section 1 — Decision */}
+        <section>
+          <p className="text-[11px] font-medium text-white/50 uppercase tracking-wider mb-1.5">
+            Decision
+          </p>
+          <h3 className="text-lg font-semibold text-white leading-snug">
+            {result.decision_question}
+          </h3>
+          <p className="mt-2 text-sm text-white/80 leading-relaxed max-w-2xl">
+            {result.decision_summary}
+          </p>
+        </section>
+
+        {/* Section 2 — Core Tensions (with raised_by) */}
+        {result.core_tensions?.length > 0 && (
+          <section>
+            <p className="text-[11px] font-medium text-white/50 uppercase tracking-wider mb-2">
+              Core issues / key tensions
+            </p>
+            <ul className="space-y-2">
+              {result.core_tensions.map((t, i) => (
+                <li
+                  key={i}
+                  className="flex items-start gap-2 text-sm text-white/90 leading-relaxed"
+                >
+                  <span className="text-amber-400 mt-0.5 shrink-0">•</span>
+                  <div>
+                    <p className="font-semibold text-white/95 flex items-center gap-2 flex-wrap">
+                      {t.title}
+                      {t.raised_by && <PersonaChip name={t.raised_by} />}
+                    </p>
+                    <p className="text-white/75 text-sm">{t.explanation}</p>
+                  </div>
+                </li>
+              ))}
+            </ul>
+          </section>
+        )}
+
+        {/* Section 4 — Expert Alignment (Two-Column) */}
+        <section className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          {/* Agree */}
+          <div className="rounded-xl border border-white/10 bg-white/5 p-4">
+            <p className="text-[11px] font-medium text-emerald-400/90 uppercase tracking-wider mb-2 flex items-center gap-2">
+              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
+              What experts agree on
+            </p>
+            <ul className="space-y-1.5 text-sm text-white/85">
+              {agreementItems.map((item, i) => (
+                <li key={i} className="leading-relaxed">
+                  <ColorCodedText text={item} />
+                </li>
+              ))}
+            </ul>
+          </div>
+
+          {/* Disagree — structured tradeoffs */}
+          <div className="rounded-xl border border-white/10 bg-white/5 p-4">
+            <p className="text-[11px] font-medium text-amber-400/90 uppercase tracking-wider mb-2 flex items-center gap-2">
+              <span className="w-1.5 h-1.5 rounded-full bg-amber-500" />
+              Where experts disagree
+            </p>
+            <ul className="space-y-1.5 text-sm text-white/85">
+              {Array.isArray(result.tradeoffs) ? (
+                result.tradeoffs.map((t, i) => {
+                  const colorA = getPersonaColor(t.persona_a);
+                  const colorB = getPersonaColor(t.persona_b);
+                  return (
+                    <li
+                      key={i}
+                      className={`rounded-lg border border-white/10 px-3 py-2 leading-relaxed ${i % 2 === 0 ? "bg-white/[0.07]" : "bg-white/[0.04]"}`}
+                    >
+                      <span className="font-semibold text-white/95">
+                        <span style={{ color: colorA }} className="font-medium">
+                          {t.persona_a}
+                        </span>{" "}
+                        ({t.score_a}) vs{" "}
+                        <span style={{ color: colorB }} className="font-medium">
+                          {t.persona_b}
+                        </span>{" "}
+                        ({t.score_b})
+                      </span>
+                      <span className="text-white/75">
+                        {" "}
+                        — {t.explanation}
+                      </span>
+                    </li>
+                  );
+                })
+              ) : (
+                <li className="leading-relaxed">
+                  <ColorCodedText text={String(result.tradeoffs)} />
+                </li>
+              )}
+            </ul>
+          </div>
+        </section>
+
+        {/* Section 5 — Paths Forward */}
+        {result.paths?.length > 0 && (
+          <section>
+            <p className="text-[11px] font-medium text-white/50 uppercase tracking-wider mb-3">
+              Paths forward
+            </p>
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+              {result.paths.map((path) => (
+                <div
+                  key={path.id}
+                  className="rounded-xl border border-white/10 bg-white/[0.03] p-4 flex flex-col"
+                >
+                  <h5 className="text-sm font-semibold text-white">
+                    {path.title}
+                  </h5>
+                  <p className="mt-1.5 text-xs text-white/75 leading-relaxed line-clamp-3">
+                    {path.description}
+                  </p>
+                  {path.favored_by?.length > 0 && (
+                    <p className="mt-3 text-[11px] text-white/60 flex flex-wrap gap-1.5 items-center">
+                      <span className="text-white/50">Favored by:</span>
+                      {path.favored_by.map((f) => (
+                        <PersonaChip key={f.persona} name={f.persona} />
+                      ))}
+                    </p>
+                  )}
+                </div>
+              ))}
+            </div>
+          </section>
+        )}
+
+        {/* Section 6 — Recommended Path */}
+        {result.recommended_path && (
+          <section className="rounded-xl border-2 border-emerald-500/40 bg-emerald-950/25 p-5">
+            <p className="text-[11px] font-medium text-emerald-400 uppercase tracking-wider mb-2">
+              Recommended path
+            </p>
+            <h4 className="text-base font-semibold text-white">
+              {result.recommended_path.title}
+            </h4>
+            <p className="mt-2 text-sm text-white/90 leading-relaxed">
+              {result.recommended_path.why_best}
+            </p>
+          </section>
+        )}
+
+        {/* Section 7 — Next Steps Timeline */}
+        {result.next_steps?.length > 0 && (
+          <section>
+            <p className="text-[11px] font-medium text-white/50 uppercase tracking-wider mb-4">
+              Next steps
+            </p>
+            <div className="relative">
+              {result.next_steps.map((step, i) => {
+                const isLast = i === result.next_steps.length - 1;
+                const ownerMatch = step.match(/\(([^)]+)\)/);
+                const ownerText = ownerMatch ? ownerMatch[1] : null;
+                const stepText = ownerMatch
+                  ? step.replace(ownerMatch[0], "").trim()
+                  : step;
+
+                return (
+                  <div key={i} className="flex gap-4 group">
+                    <div className="flex flex-col items-center shrink-0 w-8">
+                      <div className="w-3 h-3 rounded-full border-2 border-emerald-500 bg-emerald-500/20 shrink-0 mt-1 group-hover:bg-emerald-500/40 transition-colors" />
+                      {!isLast && (
+                        <div className="w-px flex-1 bg-gradient-to-b from-emerald-500/40 to-white/10 min-h-[2rem]" />
+                      )}
+                    </div>
+                    <div className={`pb-5 ${isLast ? "pb-0" : ""} flex-1 min-w-0`}>
+                      <p className="text-sm text-white/90 leading-relaxed">
+                        {stepText}
+                      </p>
+                      {ownerText && (
+                        <span className="inline-block mt-1.5 text-[10px] font-medium text-emerald-400/80 bg-emerald-500/10 px-2 py-0.5 rounded-full">
+                          {ownerText}
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </section>
+        )}
+
+        {/* Persona Score Snapshot (before Sources) */}
+        <section>
+          <p className="text-[11px] font-medium text-white/50 uppercase tracking-wider mb-3">
+            Persona score snapshot
+          </p>
+
+          {/* Score bar */}
+          <div className="flex h-2 rounded-full overflow-hidden bg-white/10 mb-4">
+            {result.personas.map((p, i) => (
+              <div
+                key={p.name}
+                className={`${i === 0 ? "rounded-l-full" : ""} ${i === result.personas.length - 1 ? "rounded-r-full" : ""}`}
+                style={{
+                  width: `${(p.score / totalScore) * 100}%`,
+                  backgroundColor: getPersonaColor(p.name),
+                  minWidth: "6px",
+                }}
+                title={`${p.name}: ${p.score}`}
+              />
+            ))}
+          </div>
+
+          {/* Collapsible persona rows */}
+          <div className="space-y-2">
+            {result.personas.map((p) => {
+              const isOpen = expandedPersonas[p.name] ?? false;
+              const color = getPersonaColor(p.name);
+              return (
+                <div key={p.name}>
+                  <button
+                    type="button"
+                    onClick={() => togglePersona(p.name)}
+                    className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg hover:bg-white/5 transition-colors group"
+                  >
+                    <span className="text-white/40 group-hover:text-white/60 transition-colors">
+                      {isOpen ? (
+                        <ChevronDown className="w-4 h-4" />
+                      ) : (
+                        <ChevronRight className="w-4 h-4" />
+                      )}
+                    </span>
+                    <span
+                      className="w-2 h-2 rounded-full shrink-0"
+                      style={{ backgroundColor: color }}
+                    />
+                    <span
+                      className="text-sm font-medium flex-1 text-left"
+                      style={{ color }}
+                    >
+                      {p.name}
+                    </span>
+                    <span className="text-sm font-semibold text-white tabular-nums">
+                      {p.score}
+                      <span className="text-white/40 font-normal">
+                        /100
+                      </span>
+                    </span>
+                  </button>
+
+                  {/* Locked expanded content */}
+                  {isOpen && (
+                    <div
+                      className="ml-10 mr-3 mt-1 mb-2 rounded-lg border px-4 py-4 bg-white/[0.02] no-pdf"
+                      style={{ borderColor: color + "30" }}
+                    >
+                      <div className="space-y-2 mb-4 opacity-30 select-none pointer-events-none">
+                        <div className="h-3 w-3/4 bg-white/15 rounded" />
+                        <div className="h-3 w-full bg-white/10 rounded" />
+                        <div className="h-3 w-5/6 bg-white/10 rounded" />
+                        <div className="h-3 w-2/3 bg-white/15 rounded" />
+                      </div>
+                      <div className="flex flex-col items-center gap-2 pt-2 border-t border-white/10">
+                        <div className="flex items-center gap-1.5 text-white/50 text-xs">
+                          <Lock className="w-3 h-3" />
+                          <span>
+                            Full {p.name.toLowerCase()} analysis available with
+                            Shura
+                          </span>
+                        </div>
+                        <a
+                          href="#cta"
+                          className="text-xs font-medium px-3 py-1.5 rounded-md bg-white/10 text-white/80 hover:bg-white/15 hover:text-white transition-colors"
+                        >
+                          Join waitlist
+                        </a>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        </section>
+
+        {/* Section 8 — Sources & References */}
+        {result.sources && result.sources.length > 0 && (
+          <section>
+            <p className="text-[11px] font-medium text-white/50 uppercase tracking-wider mb-2">
+              Sources & references
+            </p>
+            <ul className="space-y-1.5">
+              {result.sources.map((src, i) => (
+                <li
+                  key={i}
+                  className="flex items-start gap-2 text-sm text-white/70"
+                >
+                  <FileText className="w-3.5 h-3.5 mt-0.5 shrink-0 text-white/30" />
+                  <span className="flex-1">{src}</span>
+                  <span className="text-[9px] font-medium uppercase tracking-wider px-1.5 py-0.5 rounded bg-white/10 text-white/40 shrink-0">
+                    Demo
+                  </span>
+                </li>
+              ))}
+            </ul>
+            <p className="mt-3 text-xs text-white/40">
+              Full source tracking and citations available in the complete
+              platform.
+            </p>
+          </section>
+        )}
+
+        {/* Section 9 — Decision Tree Teaser (Locked) */}
+        <section className="rounded-xl border-2 border-dashed border-white/15 bg-white/[0.02] p-6 no-pdf">
+          <div className="flex flex-col items-center text-center gap-3">
+            <div className="flex items-center gap-2 text-white/50">
+              <GitBranch className="w-5 h-5" />
+              <Lock className="w-3.5 h-3.5" />
+            </div>
+            <h4 className="text-sm font-semibold text-white/80">
+              Decision tree
+            </h4>
+            <p className="text-xs text-white/50 max-w-md leading-relaxed">
+              Explore branching paths, compare alternatives, and trace how each
+              persona evaluated the decision — with weighted scoring and
+              trade-off visualisation.
+            </p>
+            <a
+              href="#cta"
+              className="mt-1 inline-flex items-center gap-1.5 text-xs font-medium px-4 py-2 rounded-lg bg-emerald-600/20 text-emerald-400 hover:bg-emerald-600/30 transition-colors"
+            >
+              Get full access
+            </a>
+          </div>
+        </section>
+      </div>
+    </div>
+  );
+}
+
+// ─── Main Component ──────────────────────────────────────────────────────────
+
+const DemoSection = () => {
+  const [title, setTitle] = useState("");
+  const [description, setDescription] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [result, setResult] = useState<DemoAnalysisResponse | null>(null);
+  const resultRef = useRef<HTMLDivElement | null>(null);
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError(null);
+
+    const trimmed = title.trim();
+    if (!trimmed) {
+      setError("Please enter a decision to evaluate.");
+      return;
+    }
+
+    setLoading(true);
+    try {
+      const data = await runDemoAnalysis(trimmed, description.trim());
+      setResult(data);
+    } catch (err) {
+      setError(
+        err instanceof Error
+          ? err.message
+          : "Something went wrong. Please try again.",
+      );
+      setResult(null);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleDownloadPdf = async () => {
+    if (!resultRef.current) return;
+    const el = resultRef.current;
+    try {
+      toast.info("Generating PDF…");
+      // Capture full element size to avoid side clipping
+      const captureWidth = Math.max(el.offsetWidth, el.scrollWidth);
+      const captureHeight = Math.max(el.offsetHeight, el.scrollHeight);
+      const canvas = await html2canvas(el, {
+        scale: 2,
+        useCORS: true,
+        backgroundColor: "#1e1e2e",
+        ignoreElements: (node) => (node as Element).classList?.contains("no-pdf"),
+        width: captureWidth,
+        height: captureHeight,
+        windowWidth: captureWidth,
+        windowHeight: captureHeight,
+        scrollX: 0,
+        scrollY: 0,
+      });
+      const imgData = canvas.toDataURL("image/png");
+      const pdf = new jsPDF("p", "mm", "a4");
+      const pageWidth = pdf.internal.pageSize.getWidth();
+      const pageHeight = pdf.internal.pageSize.getHeight();
+      const margin = 12;
+      const usableWidth = pageWidth - margin * 2;
+      const usableHeight = pageHeight - margin * 2;
+      const imgProps = pdf.getImageProperties(imgData);
+      const imgHeight = (imgProps.height * usableWidth) / imgProps.width;
+
+      if (imgHeight <= usableHeight) {
+        pdf.addImage(imgData, "PNG", margin, margin, usableWidth, imgHeight);
+      } else {
+        const pageCanvas = document.createElement("canvas");
+        const ctx = pageCanvas.getContext("2d")!;
+        const scaledPageH = (usableHeight / usableWidth) * canvas.width;
+        pageCanvas.width = canvas.width;
+        let srcY = 0;
+        let page = 0;
+        while (srcY < canvas.height) {
+          const remaining = canvas.height - srcY;
+          const sliceH = Math.min(Math.ceil(scaledPageH), Math.ceil(remaining));
+          if (sliceH <= 0) break;
+          pageCanvas.height = sliceH;
+          ctx.clearRect(0, 0, pageCanvas.width, pageCanvas.height);
+          ctx.drawImage(canvas, 0, srcY, canvas.width, sliceH, 0, 0, canvas.width, sliceH);
+          const sliceData = pageCanvas.toDataURL("image/png");
+          const sliceImgH = (sliceH * usableWidth) / canvas.width;
+          if (page > 0) pdf.addPage();
+          pdf.addImage(sliceData, "PNG", margin, margin, usableWidth, sliceImgH);
+          srcY += sliceH;
+          page++;
+        }
+      }
+
+      const fileName = `shura-brief-${(result?.decision_title || "decision").replace(/\s+/g, "-").toLowerCase().slice(0, 40)}.pdf`;
+      pdf.save(fileName);
+      toast.success("PDF downloaded.");
+    } catch {
+      toast.error("Unable to generate PDF. Please try again.");
+    }
+  };
+
+  const handleCopyLink = async () => {
+    try {
+      await navigator.clipboard.writeText(window.location.href);
+      toast.success("Link copied to clipboard.");
+    } catch {
+      toast.error("Unable to copy link.");
+    }
+  };
+
+  return (
+    <section
+      id="demo"
+      className="py-16 sm:py-20 md:py-24 relative z-10"
+    >
+      <div className="container max-w-5xl">
+        {/* Heading */}
+        <div className="max-w-2xl mx-auto text-center mb-10">
+          <SectionLabel>Decision Analysis</SectionLabel>
+          <h2 className="text-2xl sm:text-3xl md:text-4xl font-bold text-foreground mb-3">
+            See how Shura structures a decision
+          </h2>
+          <p className="text-sm sm:text-base text-muted-foreground max-w-xl mx-auto">
+            Type a real decision you&apos;re considering with context. Shura will generate a
+            structured executive brief from our different specialist to give you shareable insights with your team.
+          </p>
+        </div>
+
+        {/* Form */}
+        <form
+          onSubmit={handleSubmit}
+          className="max-w-2xl mx-auto space-y-4 mb-12"
+        >
+          <div className="space-y-2">
+            <label
+              htmlFor="demo-title"
+              className="text-xs font-medium text-muted-foreground"
+            >
+              Decision title
+            </label>
+            <Input
+              id="demo-title"
+              placeholder="Expand into European market"
+              value={title}
+              onChange={(e) => setTitle(e.target.value)}
+              disabled={loading}
+              className="bg-background"
+            />
+          </div>
+          <div className="space-y-2">
+            <label
+              htmlFor="demo-desc"
+              className="text-xs font-medium text-muted-foreground"
+            >
+              Context
+            </label>
+            <Textarea
+              id="demo-desc"
+              placeholder="B2B SaaS company, $5M ARR, 50 employees, US-only. Considering EU expansion but concerned about runway and regulatory complexity."
+              maxLength={600}
+              value={description}
+              onChange={(e) => setDescription(e.target.value)}
+              disabled={loading}
+              className="bg-background text-sm"
+              rows={3}
+            />
+            <p className="text-[10px] text-muted-foreground/80 text-right">
+              {description.length}/600
+            </p>
+          </div>
+
+          {/* Locked document upload teaser */}
+          <div className="rounded-lg border border-dashed border-white/10 bg-white/[0.02] px-4 py-3 cursor-not-allowed select-none flex items-center justify-between gap-3">
+            <div className="flex items-center gap-3 opacity-40">
+              <Paperclip className="w-4 h-4 text-white/50 shrink-0" />
+              <span className="text-sm text-white/50">
+                Attach documents, reports, or data files
+              </span>
+            </div>
+            <span className="flex items-center gap-1.5 text-xs font-medium text-white/60 bg-white/5 px-3 py-1.5 rounded-md border border-white/10 shrink-0">
+              <Lock className="w-3 h-3" />
+              Available in full product
+            </span>
+          </div>
+
+          {error && <p className="text-xs text-destructive">{error}</p>}
+          <Button
+            type="submit"
+            variant="hero-secondary"
+            size="xl"
+            disabled={loading}
+            className="w-full sm:w-auto"
+          >
+            {loading ? "Analyzing…" : "Run demo analysis"}
+          </Button>
+        </form>
+
+        {/* Loading skeleton */}
+        {loading && (
+          <div className="max-w-4xl mx-auto">
+            <div className="bg-[#1e1e2e] border border-white/10 rounded-2xl shadow-2xl p-6 space-y-6 animate-pulse">
+              <div className="h-5 w-48 bg-white/10 rounded" />
+              <div className="h-4 w-3/4 bg-white/10 rounded" />
+              <div className="h-3 w-2/3 bg-white/10 rounded" />
+              <div className="flex gap-4">
+                {[1, 2, 3, 4, 5].map((n) => (
+                  <div key={n} className="h-3 w-20 bg-white/10 rounded" />
+                ))}
+              </div>
+              <div className="h-2 w-full bg-white/10 rounded-full" />
+              <div className="space-y-3">
+                <div className="h-3 w-1/2 bg-white/10 rounded" />
+                <div className="h-3 w-3/4 bg-white/10 rounded" />
+                <div className="h-3 w-2/3 bg-white/10 rounded" />
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Result */}
+        {!loading && result && (
+          <div className="max-w-4xl mx-auto space-y-4">
+            <ResultPanel result={result} panelRef={resultRef} />
+
+            {/* Action buttons */}
+            <div className="flex flex-wrap gap-3 justify-center">
+              <Button variant="secondary" size="sm" onClick={handleDownloadPdf}>
+                <Download className="w-3.5 h-3.5 mr-1.5" />
+                Download PDF
+              </Button>
+              <Button variant="outline" size="sm" onClick={handleCopyLink}>
+                Copy share link
+              </Button>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => {
+                  setResult(null);
+                  setTitle("");
+                  setDescription("");
+                }}
+              >
+                Try another decision
+              </Button>
+            </div>
+          </div>
+        )}
+      </div>
+    </section>
+  );
+};
+
+export default DemoSection;
