@@ -231,7 +231,11 @@ async function runDemoAnalysis(
   companyStage: string,
   industry: string,
 ): Promise<DemoAnalysisResponse> {
-  const base = (API_BASE || "http://127.0.0.1:3001").replace(/\/$/, "");
+  const base = API_BASE
+    ? API_BASE.replace(/\/$/, "")
+    : import.meta.env.DEV
+      ? "http://127.0.0.1:3001"
+      : (typeof window !== "undefined" ? window.location.origin : "");
   const res = await fetch(`${base}/api/demo-analysis`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
