@@ -66,17 +66,17 @@ export default function SharedAnalysisView({ shareId }: { shareId: string }) {
   };
 
   return (
-    <div className="min-h-screen bg-background py-8 px-4">
+    <div className="min-h-screen bg-background py-4 sm:py-6 md:py-8 px-3 sm:px-4">
       <div className="max-w-4xl mx-auto">
-        <div className="flex items-center justify-between gap-4 mb-6">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-4 mb-4 sm:mb-6">
           <a
             href="/"
-            className="inline-flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground"
+            className="inline-flex items-center gap-2 text-xs sm:text-sm text-muted-foreground hover:text-foreground"
           >
-            <ArrowLeft className="w-4 h-4" />
+            <ArrowLeft className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
             Back to Shura
           </a>
-          <Button variant="secondary" size="sm" onClick={handleDownloadPdf}>
+          <Button variant="secondary" size="sm" onClick={handleDownloadPdf} className="w-full sm:w-auto">
             <Download className="w-3.5 h-3.5 mr-1.5" />
             Download PDF
           </Button>

@@ -63,6 +63,52 @@ async function trackEvent(
   }
 }
 
+const LOADING_MESSAGES = [
+  "Shura is getting all the details right for you…",
+  "Consulting Legal, Financial, and Technical perspectives…",
+  "Weighing tradeoffs and tensions…",
+  "Structuring the recommended path…",
+  "Preparing your executive brief…",
+  "Almost there…",
+];
+
+function LoadingAnalysis() {
+  const [messageIndex, setMessageIndex] = useState(0);
+
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setMessageIndex((i) => (i + 1) % LOADING_MESSAGES.length);
+    }, 3500);
+    return () => clearInterval(interval);
+  }, []);
+
+  return (
+    <div className="max-w-2xl mx-auto">
+      <div className="bg-[#1e1e2e] border border-white/10 rounded-xl sm:rounded-2xl shadow-2xl p-8 sm:p-10 text-center">
+        <div className="flex justify-center mb-6">
+          <div className="w-12 h-12 rounded-full border-2 border-emerald-500/50 border-t-emerald-400 animate-spin" />
+        </div>
+        <p className="text-sm sm:text-base text-white/90 font-medium mb-2">
+          {LOADING_MESSAGES[messageIndex]}
+        </p>
+        <p className="text-xs text-white/50">
+          This may take 15–30 seconds
+        </p>
+        <div className="mt-6 flex justify-center gap-1">
+          {LOADING_MESSAGES.map((_, i) => (
+            <div
+              key={i}
+              className={`w-1.5 h-1.5 rounded-full transition-colors ${
+                i === messageIndex ? "bg-emerald-400" : "bg-white/20"
+              }`}
+            />
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ─── Inline SectionLabel (self-contained, no external dependency) ────────────
 
 const SectionLabel = ({ children }: { children: React.ReactNode }) => (
@@ -251,39 +297,39 @@ export function ResultPanel({
   return (
     <div
       ref={panelRef}
-      className="bg-[#1e1e2e] border border-white/10 rounded-2xl shadow-2xl max-w-4xl w-full"
+      className="bg-[#1e1e2e] border border-white/10 rounded-xl sm:rounded-2xl shadow-2xl max-w-4xl w-full overflow-hidden"
     >
       {/* Header Bar */}
-      <div className="flex flex-wrap items-center justify-between gap-3 px-6 pt-5 pb-4 border-b border-white/10">
-        <div className="flex flex-wrap items-center gap-3 min-w-0">
-          <h2 className="text-base font-semibold text-white shrink-0">
+      <div className="flex flex-col sm:flex-row sm:flex-wrap sm:items-center sm:justify-between gap-2 sm:gap-3 px-4 sm:px-6 pt-4 sm:pt-5 pb-3 sm:pb-4 border-b border-white/10">
+        <div className="flex flex-wrap items-center gap-2 sm:gap-3 min-w-0">
+          <h2 className="text-sm sm:text-base font-semibold text-white shrink-0">
             Decision breakdown
           </h2>
-          <span className="text-sm text-white/70 font-medium whitespace-nowrap shrink-0">
+          <span className="text-xs sm:text-sm text-white/70 font-medium shrink-0">
             Total: {totalScore} / {maxScore}
           </span>
         </div>
         <div className="flex items-center gap-2 shrink-0">
-          <span className={`text-[11px] font-medium uppercase tracking-wider ${goThroughColor}`}>
+          <span className={`text-[10px] sm:text-[11px] font-medium uppercase tracking-wider ${goThroughColor}`}>
             {goThroughLabel}
           </span>
-          <span className={`text-2xl font-bold tabular-nums ${goThroughColor}`}>
+          <span className={`text-xl sm:text-2xl font-bold tabular-nums ${goThroughColor}`}>
             {goThroughPct}%
           </span>
         </div>
       </div>
 
       {/* Body */}
-      <div className="p-6 space-y-8">
+      <div className="p-4 sm:p-6 space-y-6 sm:space-y-8">
         {/* Section 1 — Decision */}
         <section>
-          <p className="text-[11px] font-medium text-white/50 uppercase tracking-wider mb-1.5">
+          <p className="text-[10px] sm:text-[11px] font-medium text-white/50 uppercase tracking-wider mb-1.5">
             Decision
           </p>
-          <h3 className="text-lg font-semibold text-white leading-snug">
+          <h3 className="text-base sm:text-lg font-semibold text-white leading-snug">
             {result.decision_question}
           </h3>
-          <p className="mt-2 text-sm text-white/80 leading-relaxed max-w-2xl">
+          <p className="mt-2 text-xs sm:text-sm text-white/80 leading-relaxed max-w-2xl">
             {result.decision_summary}
           </p>
         </section>
@@ -291,14 +337,14 @@ export function ResultPanel({
         {/* Section 2 — Core Tensions (with raised_by) */}
         {result.core_tensions?.length > 0 && (
           <section>
-            <p className="text-[11px] font-medium text-white/50 uppercase tracking-wider mb-2">
+            <p className="text-[10px] sm:text-[11px] font-medium text-white/50 uppercase tracking-wider mb-2">
               Core issues / key tensions
             </p>
             <ul className="space-y-2">
               {result.core_tensions.map((t, i) => (
                 <li
                   key={i}
-                  className="flex items-start gap-2 text-sm text-white/90 leading-relaxed"
+                  className="flex items-start gap-2 text-xs sm:text-sm text-white/90 leading-relaxed"
                 >
                   <span className="text-amber-400 mt-0.5 shrink-0">•</span>
                   <div>
@@ -315,14 +361,14 @@ export function ResultPanel({
         )}
 
         {/* Section 4 — Expert Alignment (Two-Column) */}
-        <section className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <section className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6">
           {/* Agree */}
-          <div className="rounded-xl border border-white/10 bg-white/5 p-4">
+          <div className="rounded-lg sm:rounded-xl border border-white/10 bg-white/5 p-3 sm:p-4">
             <p className="text-[11px] font-medium text-emerald-400/90 uppercase tracking-wider mb-2 flex items-center gap-2">
               <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
               What experts agree on
             </p>
-            <ul className="space-y-1.5 text-sm text-white/85">
+            <ul className="space-y-1.5 text-xs sm:text-sm text-white/85">
               {agreementItems.map((item, i) => (
                 <li key={i} className="leading-relaxed">
                   <ColorCodedText text={item} />
@@ -332,12 +378,12 @@ export function ResultPanel({
           </div>
 
           {/* Disagree — structured tradeoffs */}
-          <div className="rounded-xl border border-white/10 bg-white/5 p-4">
+          <div className="rounded-lg sm:rounded-xl border border-white/10 bg-white/5 p-3 sm:p-4">
             <p className="text-[11px] font-medium text-amber-400/90 uppercase tracking-wider mb-2 flex items-center gap-2">
               <span className="w-1.5 h-1.5 rounded-full bg-amber-500" />
               Where experts disagree
             </p>
-            <ul className="space-y-1.5 text-sm text-white/85">
+            <ul className="space-y-1.5 text-xs sm:text-sm text-white/85">
               {Array.isArray(result.tradeoffs) ? (
                 result.tradeoffs.map((t, i) => {
                   const colorA = getPersonaColor(t.persona_a);
@@ -345,7 +391,7 @@ export function ResultPanel({
                   return (
                     <li
                       key={i}
-                      className={`rounded-lg border border-white/10 px-3 py-2 leading-relaxed ${i % 2 === 0 ? "bg-white/[0.07]" : "bg-white/[0.04]"}`}
+                      className={`rounded-lg border border-white/10 px-3 py-2 leading-relaxed text-xs sm:text-sm ${i % 2 === 0 ? "bg-white/[0.07]" : "bg-white/[0.04]"}`}
                     >
                       <span className="font-semibold text-white/95">
                         <span style={{ color: colorA }} className="font-medium">
@@ -376,14 +422,14 @@ export function ResultPanel({
         {/* Section 5 — Paths Forward */}
         {result.paths?.length > 0 && (
           <section>
-            <p className="text-[11px] font-medium text-white/50 uppercase tracking-wider mb-3">
+            <p className="text-[10px] sm:text-[11px] font-medium text-white/50 uppercase tracking-wider mb-3">
               Paths forward
             </p>
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4">
               {result.paths.map((path) => (
                 <div
                   key={path.id}
-                  className="rounded-xl border border-white/10 bg-white/[0.03] p-4 flex flex-col"
+                  className="rounded-lg sm:rounded-xl border border-white/10 bg-white/[0.03] p-3 sm:p-4 flex flex-col"
                 >
                   <h5 className="text-sm font-semibold text-white">
                     {path.title}
@@ -407,14 +453,14 @@ export function ResultPanel({
 
         {/* Section 6 — Recommended Path */}
         {result.recommended_path && (
-          <section className="rounded-xl border-2 border-emerald-500/40 bg-emerald-950/25 p-5">
+          <section className="rounded-lg sm:rounded-xl border-2 border-emerald-500/40 bg-emerald-950/25 p-4 sm:p-5">
             <p className="text-[11px] font-medium text-emerald-400 uppercase tracking-wider mb-2">
               Recommended path
             </p>
-            <h4 className="text-base font-semibold text-white">
+            <h4 className="text-sm sm:text-base font-semibold text-white">
               {result.recommended_path.title}
             </h4>
-            <p className="mt-2 text-sm text-white/90 leading-relaxed">
+            <p className="mt-2 text-xs sm:text-sm text-white/90 leading-relaxed">
               {result.recommended_path.why_best}
             </p>
           </section>
@@ -423,7 +469,7 @@ export function ResultPanel({
         {/* Section 7 — Next Steps Timeline */}
         {result.next_steps?.length > 0 && (
           <section>
-            <p className="text-[11px] font-medium text-white/50 uppercase tracking-wider mb-4">
+            <p className="text-[10px] sm:text-[11px] font-medium text-white/50 uppercase tracking-wider mb-3 sm:mb-4">
               Next steps
             </p>
             <div className="relative">
@@ -444,7 +490,7 @@ export function ResultPanel({
                       )}
                     </div>
                     <div className={`pb-5 ${isLast ? "pb-0" : ""} flex-1 min-w-0`}>
-                      <p className="text-sm text-white/90 leading-relaxed">
+                      <p className="text-xs sm:text-sm text-white/90 leading-relaxed">
                         {stepText}
                       </p>
                       {ownerText && (
@@ -462,7 +508,7 @@ export function ResultPanel({
 
         {/* Persona Score Snapshot (before Sources) */}
         <section>
-          <p className="text-[11px] font-medium text-white/50 uppercase tracking-wider mb-3">
+          <p className="text-[10px] sm:text-[11px] font-medium text-white/50 uppercase tracking-wider mb-3">
             Persona score snapshot
           </p>
 
@@ -492,7 +538,7 @@ export function ResultPanel({
                   <button
                     type="button"
                     onClick={() => togglePersona(p.name)}
-                    className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg hover:bg-white/5 transition-colors group"
+                    className="w-full flex items-center gap-2 sm:gap-3 px-3 py-2 sm:py-2.5 rounded-lg hover:bg-white/5 transition-colors group"
                   >
                     <span className="text-white/40 group-hover:text-white/60 transition-colors">
                       {isOpen ? (
@@ -522,7 +568,7 @@ export function ResultPanel({
                   {/* Locked expanded content */}
                   {isOpen && (
                     <div
-                      className="ml-10 mr-3 mt-1 mb-2 rounded-lg border px-4 py-4 bg-white/[0.02] no-pdf"
+                      className="ml-6 sm:ml-10 mr-2 sm:mr-3 mt-1 mb-2 rounded-lg border px-3 sm:px-4 py-3 sm:py-4 bg-white/[0.02] no-pdf"
                       style={{ borderColor: color + "30" }}
                     >
                       <div className="space-y-2 mb-4 opacity-30 select-none pointer-events-none">
@@ -557,14 +603,14 @@ export function ResultPanel({
         {/* Section 8 — Sources & References */}
         {result.sources && result.sources.length > 0 && (
           <section>
-            <p className="text-[11px] font-medium text-white/50 uppercase tracking-wider mb-2">
+            <p className="text-[10px] sm:text-[11px] font-medium text-white/50 uppercase tracking-wider mb-2">
               Sources & references
             </p>
             <ul className="space-y-1.5">
               {result.sources.map((src, i) => (
                 <li
                   key={i}
-                  className="flex items-start gap-2 text-sm text-white/70"
+                  className="flex items-start gap-2 text-xs sm:text-sm text-white/70 break-words"
                 >
                   <FileText className="w-3.5 h-3.5 mt-0.5 shrink-0 text-white/30" />
                   <span className="flex-1">{src}</span>
@@ -582,7 +628,7 @@ export function ResultPanel({
         )}
 
         {/* Section 9 — Decision Tree Teaser (Locked) */}
-        <section className="rounded-xl border-2 border-dashed border-white/15 bg-white/[0.02] p-6 no-pdf">
+        <section className="rounded-lg sm:rounded-xl border-2 border-dashed border-white/15 bg-white/[0.02] p-4 sm:p-6 no-pdf">
           <div className="flex flex-col items-center text-center gap-3">
             <div className="flex items-center gap-2 text-white/50">
               <GitBranch className="w-5 h-5" />
@@ -753,9 +799,9 @@ const DemoSection = () => {
         </div>
 
         {/* Heading */}
-        <div className="max-w-2xl mx-auto text-center mb-10">
+        <div className="max-w-2xl mx-auto text-center mb-8 sm:mb-10">
           <SectionLabel>Decision Analysis</SectionLabel>
-          <h2 className="text-2xl sm:text-3xl md:text-4xl font-bold text-foreground mb-3">
+          <h2 className="text-xl sm:text-2xl md:text-3xl lg:text-4xl font-bold text-foreground mb-2 sm:mb-3">
             See how Shura structures a decision
           </h2>
           <p className="text-sm sm:text-base text-muted-foreground max-w-xl mx-auto">
@@ -767,7 +813,7 @@ const DemoSection = () => {
         {/* Form */}
         <form
           onSubmit={handleSubmit}
-          className="max-w-2xl mx-auto space-y-6 mb-12"
+          className="max-w-2xl mx-auto space-y-5 sm:space-y-6 mb-10 sm:mb-12"
         >
           <div className="space-y-2">
             <label
@@ -815,7 +861,7 @@ const DemoSection = () => {
               ))}
             </p>
           </div>
-          <div className="space-y-4 rounded-xl bg-muted/20 p-5">
+          <div className="space-y-4 rounded-xl bg-muted/20 p-4 sm:p-5">
             <label className="block text-sm font-medium text-muted-foreground">
               Context <span className="text-destructive">*</span>
             </label>
@@ -906,45 +952,29 @@ const DemoSection = () => {
           </div>
         </form>
 
-        {/* Loading skeleton */}
+        {/* Loading state */}
         {loading && (
-          <div className="max-w-4xl mx-auto">
-            <div className="bg-[#1e1e2e] border border-white/10 rounded-2xl shadow-2xl p-6 space-y-6 animate-pulse">
-              <div className="h-5 w-48 bg-white/10 rounded" />
-              <div className="h-4 w-3/4 bg-white/10 rounded" />
-              <div className="h-3 w-2/3 bg-white/10 rounded" />
-              <div className="flex gap-4">
-                {[1, 2, 3, 4, 5].map((n) => (
-                  <div key={n} className="h-3 w-20 bg-white/10 rounded" />
-                ))}
-              </div>
-              <div className="h-2 w-full bg-white/10 rounded-full" />
-              <div className="space-y-3">
-                <div className="h-3 w-1/2 bg-white/10 rounded" />
-                <div className="h-3 w-3/4 bg-white/10 rounded" />
-                <div className="h-3 w-2/3 bg-white/10 rounded" />
-              </div>
-            </div>
-          </div>
+          <LoadingAnalysis />
         )}
 
         {/* Result */}
         {!loading && result && (
-          <div className="max-w-4xl mx-auto space-y-4">
+          <div className="max-w-4xl mx-auto space-y-4 px-2 sm:px-0">
             <ResultPanel result={result} panelRef={resultRef} />
 
             {/* Action buttons */}
-            <div className="flex flex-wrap gap-3 justify-center">
-              <Button variant="secondary" size="sm" onClick={handleDownloadPdf}>
+            <div className="flex flex-col sm:flex-row flex-wrap gap-2 sm:gap-3 justify-center items-stretch sm:items-center">
+              <Button variant="secondary" size="sm" onClick={handleDownloadPdf} className="w-full sm:w-auto">
                 <Download className="w-3.5 h-3.5 mr-1.5" />
                 Download PDF
               </Button>
-              <Button variant="outline" size="sm" onClick={handleCopyLink}>
+              <Button variant="outline" size="sm" onClick={handleCopyLink} className="w-full sm:w-auto">
                 Copy share link
               </Button>
               <Button
                 variant="ghost"
                 size="sm"
+                className="w-full sm:w-auto"
                 onClick={() => {
                   setResult(null);
                   setDecision("");
@@ -961,7 +991,7 @@ const DemoSection = () => {
             </div>
 
             {/* Post-analysis CTA: save / share */}
-            <div className="rounded-xl border border-white/10 bg-white/[0.02] p-5 mt-6">
+            <div className="rounded-lg sm:rounded-xl border border-white/10 bg-white/[0.02] p-4 sm:p-5 mt-4 sm:mt-6">
               <p className="text-sm font-medium text-white/90 mb-2">
                 Save this analysis
               </p>

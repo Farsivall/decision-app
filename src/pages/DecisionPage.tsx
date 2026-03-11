@@ -31,22 +31,22 @@ export default function DecisionPage() {
       <BackgroundCards />
       <div className="relative z-10">
       {/* Simple header */}
-      <header className="border-b border-border/50 px-6 py-4">
-        <div className="container max-w-5xl flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <div className="w-8 h-8 rounded-lg bg-primary/20 border border-primary/30 flex items-center justify-center">
-              <span className="text-primary font-bold text-sm">S</span>
+      <header className="border-b border-border/50 px-4 sm:px-6 py-3 sm:py-4">
+        <div className="container max-w-5xl mx-auto flex items-center justify-between gap-2">
+          <div className="flex items-center gap-2 min-w-0">
+            <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-lg bg-primary/20 border border-primary/30 flex items-center justify-center shrink-0">
+              <span className="text-primary font-bold text-xs sm:text-sm">S</span>
             </div>
-            <span className="text-foreground font-semibold text-lg">Shura</span>
+            <span className="text-foreground font-semibold text-base sm:text-lg truncate">Shura</span>
           </div>
-          <span className="text-xs text-muted-foreground">Decision Analysis</span>
+          <span className="text-[10px] sm:text-xs text-muted-foreground shrink-0 hidden sm:inline">Decision Analysis</span>
         </div>
       </header>
 
       <DemoSection />
 
       {/* Minimal footer */}
-      <footer className="border-t border-border/50 px-6 py-6 text-center">
+      <footer className="border-t border-border/50 px-4 sm:px-6 py-4 sm:py-6 text-center">
         <p className="text-xs text-muted-foreground">
           Shura — AI Decision Simulation
         </p>
