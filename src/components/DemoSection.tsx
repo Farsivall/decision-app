@@ -4,7 +4,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
 import { Select } from "@/components/ui/select";
 import { toast } from "@/components/ui/sonner";
-import { ChevronDown, ChevronRight, Lock, GitBranch, FileText, Download, Paperclip } from "lucide-react";
+import { FileText, Download, ChevronDown, ChevronRight } from "lucide-react";
 import { exportAnalysisToPdf } from "@/lib/pdfExport";
 import { supabase } from "@/lib/supabase";
 import { getSessionId } from "@/lib/session";
@@ -70,26 +70,28 @@ function LoadingAnalysis() {
   }, []);
 
   return (
-    <div className="max-w-2xl mx-auto">
-      <div className="bg-[#1e1e2e] border border-white/10 rounded-xl sm:rounded-2xl shadow-2xl p-8 sm:p-10 text-center">
-        <div className="flex justify-center mb-6">
-          <div className="w-12 h-12 rounded-full border-2 border-emerald-500/50 border-t-emerald-400 animate-spin" />
-        </div>
-        <p className="text-sm sm:text-base text-white/90 font-medium mb-2">
-          {LOADING_MESSAGES[messageIndex]}
-        </p>
-        <p className="text-xs text-white/50">
-          This may take up to 30 seconds
-        </p>
-        <div className="mt-6 flex justify-center gap-1">
-          {LOADING_MESSAGES.map((_, i) => (
-            <div
-              key={i}
-              className={`w-1.5 h-1.5 rounded-full transition-colors ${
-                i === messageIndex ? "bg-emerald-400" : "bg-white/20"
-              }`}
-            />
-          ))}
+    <div className="flex items-center justify-center min-h-[50vh] sm:min-h-[60vh] w-full px-4">
+      <div className="w-full max-w-2xl">
+        <div className="bg-[#1e1e2e] border border-white/10 rounded-xl sm:rounded-2xl shadow-2xl p-8 sm:p-12 text-center">
+          <div className="flex justify-center mb-6">
+            <div className="w-14 h-14 rounded-full border-2 border-emerald-500/50 border-t-emerald-400 animate-spin" />
+          </div>
+          <p className="text-sm sm:text-base text-white/90 font-medium mb-2">
+            {LOADING_MESSAGES[messageIndex]}
+          </p>
+          <p className="text-xs text-white/50">
+            This may take up to 30 seconds
+          </p>
+          <div className="mt-6 flex justify-center gap-1">
+            {LOADING_MESSAGES.map((_, i) => (
+              <div
+                key={i}
+                className={`w-1.5 h-1.5 rounded-full transition-colors ${
+                  i === messageIndex ? "bg-emerald-400" : "bg-white/20"
+                }`}
+              />
+            ))}
+          </div>
         </div>
       </div>
     </div>
@@ -277,19 +279,14 @@ export function ResultPanel({
         : goThroughPct >= 40
           ? { color: "text-red-300", label: "Less likely to proceed — need more evidence" }
           : { color: "text-red-400", label: "Do not proceed" };
-  const [expandedPersonas, setExpandedPersonas] = useState<
-    Record<string, boolean>
-  >({});
   const [usefulness, setUsefulness] = useState(50);
   const [comments, setComments] = useState("");
+  const [feedbackEmail, setFeedbackEmail] = useState("");
   const [feedbackSubmitted, setFeedbackSubmitted] = useState(false);
   const [feedbackSaving, setFeedbackSaving] = useState(false);
+  const [expandedPersona, setExpandedPersona] = useState<string | null>(null);
 
-  const agreementItems = splitParagraph(result.agreement || "");
-
-  const togglePersona = (name: string) => {
-    setExpandedPersonas((prev) => ({ ...prev, [name]: !prev[name] }));
-  };
+  const agreementItems = splitParagraph(result.agreement || "").slice(0, 3);
 
   const handleFeedbackSubmit = async () => {
     if (!decisionId || !supabase || feedbackSubmitted) return;
@@ -300,17 +297,17 @@ export function ResultPanel({
         session_id: getSessionId(),
         usefulness_score: usefulness,
         comments: comments.trim() || null,
+        email: feedbackEmail.trim() || null,
       };
+      const decisionUpdate: Record<string, unknown> = {
+        feedback_usefulness_score: usefulness,
+        feedback_comments: comments.trim() || null,
+        feedback_submitted_at: new Date().toISOString(),
+      };
+      if (feedbackEmail.trim()) decisionUpdate.email = feedbackEmail.trim();
       const [{ error: feedbackErr }, { error: decisionErr }] = await Promise.all([
         supabase.from("analysis_feedback").insert(feedbackPayload),
-        supabase
-          .from("decisions")
-          .update({
-            feedback_usefulness_score: usefulness,
-            feedback_comments: comments.trim() || null,
-            feedback_submitted_at: new Date().toISOString(),
-          })
-          .eq("id", decisionId),
+        supabase.from("decisions").update(decisionUpdate).eq("id", decisionId),
       ]);
       if (!feedbackErr && !decisionErr) setFeedbackSubmitted(true);
     } finally {
@@ -325,14 +322,9 @@ export function ResultPanel({
     >
       {/* Header Bar */}
       <div className="flex flex-col sm:flex-row sm:flex-wrap sm:items-center sm:justify-between gap-2 sm:gap-3 px-4 sm:px-6 pt-4 sm:pt-5 pb-3 sm:pb-4 border-b border-white/10">
-        <div className="flex flex-wrap items-center gap-2 sm:gap-3 min-w-0">
-          <h2 className="text-sm sm:text-base font-semibold text-white shrink-0">
-            Decision breakdown
-          </h2>
-          <span className="text-xs sm:text-sm text-white/70 font-medium shrink-0">
-            Total: {totalScore} / {maxScore}
-          </span>
-        </div>
+        <h2 className="text-sm sm:text-base font-semibold text-white shrink-0">
+          Decision Brief
+        </h2>
         <div className="flex items-center gap-2 shrink-0">
           <span className={`text-[10px] sm:text-[11px] font-medium uppercase tracking-wider ${goThroughColor}`}>
             {goThroughLabel}
@@ -343,131 +335,122 @@ export function ResultPanel({
         </div>
       </div>
 
-      {/* Body */}
+      {/* Body — structured executive brief */}
       <div className="p-4 sm:p-6 space-y-6 sm:space-y-8">
-        {/* Section 1 — Decision */}
+        {/* 1. Decision Summary — headline */}
         <section>
-          <p className="text-[10px] sm:text-[11px] font-medium text-white/50 uppercase tracking-wider mb-1.5">
-            Decision
-          </p>
-          <h3 className="text-base sm:text-lg font-semibold text-white leading-snug">
+          <h3 className="text-lg sm:text-xl font-semibold text-white leading-tight">
             {result.decision_question}
           </h3>
-          <p className="mt-2 text-xs sm:text-sm text-white/80 leading-relaxed max-w-2xl">
-            {result.decision_summary}
-          </p>
+          {result.decision_summary && (
+            <p className="mt-2 text-sm text-white/80 leading-relaxed">
+              {result.decision_summary}
+            </p>
+          )}
         </section>
 
-        {/* Section 2 — Core Tensions (with raised_by) */}
+        {/* 2. Core Issues / Key Tensions — concise */}
         {result.core_tensions?.length > 0 && (
           <section>
             <p className="text-[10px] sm:text-[11px] font-medium text-white/50 uppercase tracking-wider mb-2">
               Core issues / key tensions
             </p>
-            <ul className="space-y-2">
-              {result.core_tensions.map((t, i) => (
-                <li
-                  key={i}
-                  className="flex items-start gap-2 text-xs sm:text-sm text-white/90 leading-relaxed"
-                >
-                  <span className="text-amber-400 mt-0.5 shrink-0">•</span>
-                  <div>
-                    <p className="font-semibold text-white/95 flex items-center gap-2 flex-wrap">
-                      {t.title}
-                      {t.raised_by && <PersonaChip name={t.raised_by} />}
-                    </p>
-                    <p className="text-white/75 text-sm">{t.explanation}</p>
-                  </div>
+            <ul className="space-y-1.5">
+              {result.core_tensions.slice(0, 3).map((t, i) => (
+                <li key={i} className="flex items-start gap-2 text-sm text-white/90">
+                  <span className="text-amber-400 shrink-0">•</span>
+                  <span>
+                    {t.title}
+                    {t.raised_by && !t.title.includes("(") && (
+                      <span className="text-white/60"> ({t.raised_by})</span>
+                    )}
+                  </span>
                 </li>
               ))}
             </ul>
           </section>
         )}
 
-        {/* Section 4 — Expert Alignment (Two-Column) */}
+        {/* 3. Expert Alignment — agree + disagree */}
         <section className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6">
-          {/* Agree */}
-          <div className="rounded-lg sm:rounded-xl border border-white/10 bg-white/5 p-3 sm:p-4">
-            <p className="text-[11px] font-medium text-emerald-400/90 uppercase tracking-wider mb-2 flex items-center gap-2">
-              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
+          <div className="rounded-lg border border-white/10 bg-white/5 p-4">
+            <p className="text-[11px] font-medium text-emerald-400/90 uppercase tracking-wider mb-2">
               What experts agree on
             </p>
-            <ul className="space-y-1.5 text-xs sm:text-sm text-white/85">
+            <ul className="space-y-1 text-sm text-white/85">
               {agreementItems.map((item, i) => (
-                <li key={i} className="flex items-start gap-2 leading-relaxed">
-                  <span className="text-emerald-400 mt-0.5 shrink-0">•</span>
+                <li key={i} className="flex gap-2">
+                  <span className="text-emerald-400 shrink-0">•</span>
                   <ColorCodedText text={item} />
                 </li>
               ))}
             </ul>
           </div>
-
-          {/* Disagree — structured tradeoffs */}
-          <div className="rounded-lg sm:rounded-xl border border-white/10 bg-white/5 p-3 sm:p-4">
-            <p className="text-[11px] font-medium text-amber-400/90 uppercase tracking-wider mb-2 flex items-center gap-2">
-              <span className="w-1.5 h-1.5 rounded-full bg-amber-500" />
+          <div className="rounded-lg border border-white/10 bg-white/5 p-4">
+            <p className="text-[11px] font-medium text-amber-400/90 uppercase tracking-wider mb-2">
               Where experts disagree
             </p>
-            <ul className="space-y-2 text-xs sm:text-sm text-white/85">
+            <div className="space-y-2">
               {Array.isArray(result.tradeoffs) ? (
                 result.tradeoffs.map((t, i) => {
                   const colorA = getPersonaColor(t.persona_a);
                   const colorB = getPersonaColor(t.persona_b);
                   return (
-                    <li
+                    <div
                       key={i}
-                      className="flex items-start gap-2 leading-relaxed"
+                      className="flex flex-wrap items-baseline gap-x-2 gap-y-1 text-sm border-b border-white/5 pb-2 last:border-0 last:pb-0"
                     >
-                      <span className="text-amber-400 mt-0.5 shrink-0">•</span>
-                      <div>
-                        <span className="font-semibold text-white/95">
-                          <span style={{ color: colorA }} className="font-medium">
-                            {t.persona_a}
-                          </span>{" "}
-                          ({t.score_a}) vs{" "}
-                          <span style={{ color: colorB }} className="font-medium">
-                            {t.persona_b}
-                          </span>{" "}
-                          ({t.score_b})
-                        </span>
-                        <span className="text-white/75">
-                          {" "}
-                          — {t.explanation}
-                        </span>
-                      </div>
-                    </li>
+                      <span style={{ color: colorA }} className="font-medium shrink-0">
+                        {t.persona_a}
+                      </span>
+                      <span className="text-white/50 shrink-0">vs</span>
+                      <span style={{ color: colorB }} className="font-medium shrink-0">
+                        {t.persona_b}
+                      </span>
+                      <span className="text-white/70">— {t.explanation}</span>
+                    </div>
                   );
                 })
-              ) : (
-                <li className="flex items-start gap-2 leading-relaxed">
-                  <span className="text-amber-400 shrink-0">•</span>
-                  <ColorCodedText text={String(result.tradeoffs)} />
-                </li>
-              )}
-            </ul>
+              ) : null}
+            </div>
           </div>
         </section>
 
-        {/* Section 5 — Paths Forward */}
+        {/* 4. Recommended Path — prominent conclusion */}
+        {result.recommended_path && (
+          <section className="rounded-xl border-2 border-emerald-500/40 bg-emerald-950/25 p-5 sm:p-6">
+            <p className="text-[11px] font-medium text-emerald-400 uppercase tracking-wider mb-2">
+              Recommended path
+            </p>
+            <h4 className="text-base sm:text-lg font-semibold text-white">
+              {result.recommended_path.title}
+            </h4>
+            <p className="mt-2 text-sm text-white/90 leading-relaxed">
+              {result.recommended_path.why_best}
+            </p>
+          </section>
+        )}
+
+        {/* 5. Paths Forward — cards */}
         {result.paths?.length > 0 && (
           <section>
             <p className="text-[10px] sm:text-[11px] font-medium text-white/50 uppercase tracking-wider mb-3">
               Paths forward
             </p>
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
               {result.paths.map((path) => (
                 <div
                   key={path.id}
-                  className="rounded-lg sm:rounded-xl border border-white/10 bg-white/[0.03] p-3 sm:p-4 flex flex-col"
+                  className="rounded-lg border border-white/10 bg-white/[0.03] p-4 flex flex-col"
                 >
                   <h5 className="text-sm font-semibold text-white">
                     {path.title}
                   </h5>
-                  <p className="mt-1.5 text-xs text-white/75 leading-relaxed line-clamp-3">
+                  <p className="mt-1.5 text-xs text-white/75 leading-relaxed">
                     {path.description}
                   </p>
                   {path.favored_by?.length > 0 && (
-                    <p className="mt-3 text-[11px] text-white/60 flex flex-wrap gap-1.5 items-center">
+                    <p className="mt-3 text-[11px] text-white/60 flex flex-wrap gap-1.5">
                       <span className="text-white/50">Favored by:</span>
                       {path.favored_by.map((f) => (
                         <PersonaChip key={f.persona} name={f.persona} />
@@ -480,149 +463,106 @@ export function ResultPanel({
           </section>
         )}
 
-        {/* Section 6 — Recommended Path */}
-        {result.recommended_path && (
-          <section className="rounded-lg sm:rounded-xl border-2 border-emerald-500/40 bg-emerald-950/25 p-4 sm:p-5">
-            <p className="text-[11px] font-medium text-emerald-400 uppercase tracking-wider mb-2">
-              Recommended path
-            </p>
-            <h4 className="text-sm sm:text-base font-semibold text-white">
-              {result.recommended_path.title}
-            </h4>
-            <p className="mt-2 text-xs sm:text-sm text-white/90 leading-relaxed">
-              {result.recommended_path.why_best}
-            </p>
-          </section>
-        )}
-
-        {/* Section 7 — Next Steps Timeline */}
+        {/* 6. Next Steps — timeline */}
         {result.next_steps?.length > 0 && (
           <section>
-            <p className="text-[10px] sm:text-[11px] font-medium text-white/50 uppercase tracking-wider mb-3 sm:mb-4">
+            <p className="text-[10px] sm:text-[11px] font-medium text-white/50 uppercase tracking-wider mb-3">
               Next steps
             </p>
-            <div className="relative">
-              {result.next_steps.map((step, i) => {
-                const isLast = i === result.next_steps.length - 1;
+            <ol className="space-y-2">
+              {result.next_steps.slice(0, 5).map((step, i) => {
                 const ownerMatch = step.match(/\(([^)]+)\)/);
                 const ownerText = ownerMatch ? ownerMatch[1] : null;
                 const stepText = ownerMatch
                   ? step.replace(ownerMatch[0], "").trim()
                   : step;
-
                 return (
-                  <div key={i} className="flex gap-4 group">
-                    <div className="flex flex-col items-center shrink-0 w-8">
-                      <div className="w-3 h-3 rounded-full border-2 border-emerald-500 bg-emerald-500/20 shrink-0 mt-1 group-hover:bg-emerald-500/40 transition-colors" />
-                      {!isLast && (
-                        <div className="w-px flex-1 bg-gradient-to-b from-emerald-500/40 to-white/10 min-h-[2rem]" />
-                      )}
-                    </div>
-                    <div className={`pb-5 ${isLast ? "pb-0" : ""} flex-1 min-w-0`}>
-                      <p className="text-xs sm:text-sm text-white/90 leading-relaxed">
-                        {stepText}
-                      </p>
-                      {ownerText && (
-                        <span className="inline-block mt-1.5 text-[10px] font-medium text-emerald-400/80 bg-emerald-500/10 px-2 py-0.5 rounded-full">
-                          {ownerText}
-                        </span>
-                      )}
-                    </div>
-                  </div>
+                  <li key={i} className="flex gap-3 text-sm">
+                    <span className="text-emerald-400 font-medium shrink-0">
+                      {i + 1}.
+                    </span>
+                    <span className="text-white/90">{stepText}</span>
+                    {ownerText && (
+                      <span className="text-emerald-400/80 text-xs shrink-0">
+                        ({ownerText})
+                      </span>
+                    )}
+                  </li>
                 );
               })}
-            </div>
+            </ol>
           </section>
         )}
 
-        {/* Persona Score Snapshot (before Sources) */}
+        {/* 7. Persona Score Snapshot — compact */}
         <section>
-          <p className="text-[10px] sm:text-[11px] font-medium text-white/50 uppercase tracking-wider mb-3">
+          <p className="text-[10px] sm:text-[11px] font-medium text-white/50 uppercase tracking-wider mb-2">
             Persona score snapshot
           </p>
-
-          {/* Score bar */}
-          <div className="flex h-2 rounded-full overflow-hidden bg-white/10 mb-4">
-            {result.personas.map((p, i) => (
-              <div
-                key={p.name}
-                className={`${i === 0 ? "rounded-l-full" : ""} ${i === result.personas.length - 1 ? "rounded-r-full" : ""}`}
-                style={{
-                  width: `${(p.score / totalScore) * 100}%`,
-                  backgroundColor: getPersonaColor(p.name),
-                  minWidth: "6px",
-                }}
-                title={`${p.name}: ${p.score}`}
-              />
+          <div className="flex flex-wrap gap-x-6 gap-y-1 text-sm">
+            {result.personas.map((p) => (
+              <span key={p.name} className="flex items-center gap-1.5">
+                <span
+                  className="w-1.5 h-1.5 rounded-full shrink-0"
+                  style={{ backgroundColor: getPersonaColor(p.name) }}
+                />
+                <span style={{ color: getPersonaColor(p.name) }}>{p.name}</span>
+                <span className="text-white/80 tabular-nums">— {p.score}</span>
+              </span>
             ))}
           </div>
+        </section>
 
-          {/* Collapsible persona rows */}
-          <div className="space-y-2">
+        {/* 8. Detailed Persona Reasoning — collapsible accordion */}
+        <section>
+          <p className="text-[10px] sm:text-[11px] font-medium text-white/50 uppercase tracking-wider mb-2">
+            Detailed persona analysis
+          </p>
+          <div className="space-y-1">
             {result.personas.map((p) => {
-              const isOpen = expandedPersonas[p.name] ?? false;
+              const isOpen = expandedPersona === p.name;
               const color = getPersonaColor(p.name);
               return (
-                <div key={p.name}>
+                <div
+                  key={p.name}
+                  className="rounded-lg border border-white/10 overflow-hidden"
+                >
                   <button
                     type="button"
-                    onClick={() => togglePersona(p.name)}
-                    className="w-full flex items-center gap-2 sm:gap-3 px-3 py-2 sm:py-2.5 rounded-lg hover:bg-white/5 transition-colors group"
+                    onClick={() =>
+                      setExpandedPersona(isOpen ? null : p.name)
+                    }
+                    className="w-full flex items-center gap-2 px-3 py-2.5 text-left hover:bg-white/5 transition-colors"
                   >
-                    <span className="text-white/40 group-hover:text-white/60 transition-colors">
-                      {isOpen ? (
-                        <ChevronDown className="w-4 h-4" />
-                      ) : (
-                        <ChevronRight className="w-4 h-4" />
-                      )}
-                    </span>
+                    {isOpen ? (
+                      <ChevronDown className="w-4 h-4 text-white/50" />
+                    ) : (
+                      <ChevronRight className="w-4 h-4 text-white/50" />
+                    )}
                     <span
                       className="w-2 h-2 rounded-full shrink-0"
                       style={{ backgroundColor: color }}
                     />
                     <span
-                      className="text-sm font-medium flex-1 text-left"
+                      className="text-sm font-medium flex-1"
                       style={{ color }}
                     >
                       {p.name}
                     </span>
                     <span className="text-sm font-semibold text-white tabular-nums">
-                      {p.score}
-                      <span className="text-white/40 font-normal">
-                        /100
-                      </span>
+                      {p.score}/100
                     </span>
                   </button>
-
-                  {/* Locked expanded content */}
                   {isOpen && (
                     <div
-                      className="ml-6 sm:ml-10 mr-2 sm:mr-3 mt-1 mb-2 rounded-lg border px-3 sm:px-4 py-3 sm:py-4 bg-white/[0.02] no-pdf"
-                      style={{ borderColor: color + "30" }}
+                      className="px-3 pb-3 pt-0 border-t border-white/10"
+                      style={{ borderColor: color + "20" }}
                     >
-                      <div className="space-y-2 mb-4 opacity-30 select-none pointer-events-none">
-                        <div className="h-3 w-3/4 bg-white/15 rounded" />
-                        <div className="h-3 w-full bg-white/10 rounded" />
-                        <div className="h-3 w-5/6 bg-white/10 rounded" />
-                        <div className="h-3 w-2/3 bg-white/15 rounded" />
-                      </div>
-                      <div className="flex flex-col items-center gap-2 pt-2 border-t border-white/10">
-                        <div className="flex items-center gap-1.5 text-white/50 text-xs">
-                          <Lock className="w-3 h-3" />
-                          <span>
-                            Full {p.name.toLowerCase()} analysis available with
-                            Shura
-                          </span>
-                        </div>
-                        <a
-                          href="https://shura-gilt.vercel.app/#cta"
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="text-xs font-medium px-3 py-1.5 rounded-md bg-white/10 text-white/80 hover:bg-white/15 hover:text-white transition-colors"
-                        >
-                          Join waitlist
-                        </a>
-                      </div>
+                      <p className="text-xs text-white/70 mt-2 leading-relaxed">
+                        Score reflects how favorable this decision is from the{" "}
+                        {p.name} perspective. Key considerations are derived
+                        from the tensions and tradeoffs above.
+                      </p>
                     </div>
                   )}
                 </div>
@@ -631,60 +571,24 @@ export function ResultPanel({
           </div>
         </section>
 
-        {/* Section 8 — Sources & References */}
+        {/* Sources — keep if present */}
         {result.sources && result.sources.length > 0 && (
           <section>
             <p className="text-[10px] sm:text-[11px] font-medium text-white/50 uppercase tracking-wider mb-2">
               Sources & references
             </p>
-            <ul className="space-y-1.5">
+            <ul className="space-y-1 text-sm text-white/70">
               {result.sources.map((src, i) => (
-                <li
-                  key={i}
-                  className="flex items-start gap-2 text-xs sm:text-sm text-white/70 break-words"
-                >
+                <li key={i} className="flex gap-2">
                   <FileText className="w-3.5 h-3.5 mt-0.5 shrink-0 text-white/30" />
-                  <span className="flex-1">{src}</span>
-                  <span className="text-[9px] font-medium uppercase tracking-wider px-1.5 py-0.5 rounded bg-white/10 text-white/40 shrink-0">
-                    Demo
-                  </span>
+                  <span>{src}</span>
                 </li>
               ))}
             </ul>
-            <p className="mt-3 text-xs text-white/40">
-              Full source tracking and citations available in the complete
-              platform.
-            </p>
           </section>
         )}
 
-        {/* Section 9 — Decision Tree Teaser (Locked) */}
-        <section className="rounded-lg sm:rounded-xl border-2 border-dashed border-white/15 bg-white/[0.02] p-4 sm:p-6 no-pdf">
-          <div className="flex flex-col items-center text-center gap-3">
-            <div className="flex items-center gap-2 text-white/50">
-              <GitBranch className="w-5 h-5" />
-              <Lock className="w-3.5 h-3.5" />
-            </div>
-            <h4 className="text-sm font-semibold text-white/80">
-              Decision tree
-            </h4>
-            <p className="text-xs text-white/50 max-w-md leading-relaxed">
-              Explore branching paths, compare alternatives, and trace how each
-              persona evaluated the decision — with weighted scoring and
-              trade-off visualisation.
-            </p>
-            <a
-              href="https://shura-gilt.vercel.app/#cta"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="mt-1 inline-flex items-center gap-1.5 text-xs font-medium px-4 py-2 rounded-lg bg-emerald-600/20 text-emerald-400 hover:bg-emerald-600/30 transition-colors"
-            >
-              Get full access
-            </a>
-          </div>
-        </section>
-
-        {/* Section 10 — Feedback */}
+        {/* Section 9 — Feedback */}
         {decisionId && (
           <section className="rounded-lg sm:rounded-xl border border-white/10 bg-white/[0.02] p-4 sm:p-5 no-pdf">
             <p className="text-[10px] sm:text-[11px] font-medium text-white/50 uppercase tracking-wider mb-3">
@@ -715,6 +619,14 @@ export function ResultPanel({
                   rows={2}
                   className="mb-3 bg-white/5 border-white/10 text-sm resize-none"
                 />
+                <Input
+                  type="email"
+                  placeholder="Email (optional — for follow-up)"
+                  value={feedbackEmail}
+                  onChange={(e) => setFeedbackEmail(e.target.value)}
+                  disabled={feedbackSaving}
+                  className="mb-3 bg-white/5 border-white/10 text-sm"
+                />
                 <Button
                   type="button"
                   size="sm"
@@ -730,19 +642,16 @@ export function ResultPanel({
           </section>
         )}
 
-        {/* Section 11 — Sign up for waitlist */}
+        {/* Section 10 — Sign up for waitlist */}
         <section className="rounded-lg sm:rounded-xl border border-emerald-500/30 bg-emerald-950/20 p-4 sm:p-5 no-pdf">
           <a
             href="https://shura-gilt.vercel.app/#cta"
             target="_blank"
             rel="noopener noreferrer"
-            className="flex flex-col sm:flex-row items-center justify-center gap-2 sm:gap-3 text-center group"
+            className="flex items-center justify-center text-center group"
           >
             <span className="text-sm font-semibold text-emerald-400 group-hover:text-emerald-300">
               Sign up for waitlist
-            </span>
-            <span className="text-xs text-white/60">
-              Get full access to Shura →
             </span>
           </a>
         </section>
@@ -763,7 +672,6 @@ const DemoSection = () => {
   const [error, setError] = useState<string | null>(null);
   const [result, setResult] = useState<DemoAnalysisResponse | null>(null);
   const [decisionId, setDecisionId] = useState<string | null>(null);
-  const [email, setEmail] = useState("");
   const [decisionsCount, setDecisionsCount] = useState(0);
   const resultRef = useRef<HTMLDivElement | null>(null);
 
@@ -815,7 +723,7 @@ const DemoSection = () => {
             role,
             company_stage: companyStage,
             industry,
-            email: email.trim() || null,
+            email: null,
             session_id: getSessionId(),
           })
           .select("id")
@@ -825,7 +733,6 @@ const DemoSection = () => {
           setDecisionId(id);
           incrementDecisionsCount();
           await trackEvent("decision_created", id);
-          if (email.trim()) await trackEvent("email_capture_submitted", id, { email: email.trim() });
         }
       }
 
@@ -894,8 +801,8 @@ const DemoSection = () => {
           </div>
         </div>
 
-        {/* Heading */}
-        <div className="max-w-2xl mx-auto text-center mb-8 sm:mb-10">
+        {/* Heading — hidden when loading */}
+        <div className={`max-w-2xl mx-auto text-center mb-8 sm:mb-10 transition-opacity ${loading ? "hidden" : ""}`}>
           <SectionLabel>Decision Analysis</SectionLabel>
           <h2 className="text-xl sm:text-2xl md:text-3xl lg:text-4xl font-bold text-foreground mb-2 sm:mb-3">
             See how Shura structures a decision
@@ -906,27 +813,11 @@ const DemoSection = () => {
           </p>
         </div>
 
-        {/* Form */}
+        {/* Form — hidden when loading */}
         <form
           onSubmit={handleSubmit}
-          className="max-w-2xl mx-auto space-y-5 sm:space-y-6 mb-10 sm:mb-12"
+          className={`max-w-2xl mx-auto space-y-5 sm:space-y-6 mb-10 sm:mb-12 transition-opacity ${loading ? "hidden" : ""}`}
         >
-          <div className="space-y-2">
-            <label
-              htmlFor="demo-email"
-              className="block text-sm font-medium text-muted-foreground"
-            >
-              Email <span className="text-muted-foreground/60">(optional)</span>
-            </label>
-            <Input
-              id="demo-email"
-              type="email"
-              placeholder="your@email.com"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              disabled={loading}
-            />
-          </div>
           <div className="space-y-2">
             <label
               htmlFor="demo-decision"
@@ -1021,20 +912,6 @@ const DemoSection = () => {
             </div>
           </div>
 
-          {/* Locked document upload teaser */}
-          <div className="rounded-lg border border-dashed border-white/10 bg-white/[0.02] px-4 py-3 cursor-not-allowed select-none flex items-center justify-between gap-3">
-            <div className="flex items-center gap-3 opacity-40">
-              <Paperclip className="w-4 h-4 text-white/50 shrink-0" />
-              <span className="text-sm text-white/50">
-                Attach documents, reports, or data files
-              </span>
-            </div>
-            <span className="flex items-center gap-1.5 text-xs font-medium text-white/60 bg-white/5 px-3 py-1.5 rounded-md border border-white/10 shrink-0">
-              <Lock className="w-3 h-3" />
-              Available in full product
-            </span>
-          </div>
-
           {error && <p className="text-xs text-destructive">{error}</p>}
           <div className="flex justify-center">
             <Button
@@ -1048,9 +925,11 @@ const DemoSection = () => {
           </div>
         </form>
 
-        {/* Loading state */}
+        {/* Loading state — fills middle of page */}
         {loading && (
-          <LoadingAnalysis />
+          <div className="w-full -mt-8">
+            <LoadingAnalysis />
+          </div>
         )}
 
         {/* Result */}
@@ -1079,7 +958,6 @@ const DemoSection = () => {
                   setCompanyStage("");
                   setIndustry("");
                   setDecisionId(null);
-                  setEmail("");
                 }}
               >
                 Try another decision

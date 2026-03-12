@@ -24,7 +24,7 @@ Output must include:
 1. "decision_question" — "Should we...?" question.
 2. "decision_summary" — 1–2 sentences.
 3. "personas" — array of 5: { "name": string, "score": number (0–100) }. Names: Legal, Financial, Technical, Business Development, Tax.
-4. "core_tensions" — array of 2–3: { "title": string, "explanation": string, "raised_by": string }.
+4. "core_tensions" — array of 2–3: { "title": string, "explanation": string, "raised_by": string }. Title format: "Issue A (Persona) vs Issue B (Persona)" e.g. "Regulatory risk (Legal) vs market opportunity (Business Dev)".
 5. "agreement" — one paragraph (2–4 sentences) describing what all perspectives broadly agree on. Reference persona names where useful.
 6. "tradeoffs" — array of 2–3 objects: { "persona_a": string, "score_a": number, "persona_b": string, "score_b": number, "explanation": string }. Each object is one disagreement between two named personas with their scores and a 1–2 sentence explanation of the clash. Do NOT combine multiple disagreements into one object.
 7. "recommended_path" — { "title": string, "why_best": string } (one sentence each).
