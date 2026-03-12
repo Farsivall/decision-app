@@ -109,6 +109,9 @@ const SectionLabel = ({ children }: { children: React.ReactNode }) => (
 interface DemoPersona {
   name: string;
   score: number;
+  reasoning?: string;
+  key_evidence?: string[];
+  key_evidence_missed?: string[];
 }
 
 interface DemoCoreTension {
@@ -555,14 +558,55 @@ export function ResultPanel({
                   </button>
                   {isOpen && (
                     <div
-                      className="px-3 pb-3 pt-0 border-t border-white/10"
+                      className="px-3 pb-4 pt-2 border-t border-white/10 space-y-3"
                       style={{ borderColor: color + "20" }}
                     >
-                      <p className="text-xs text-white/70 mt-2 leading-relaxed">
-                        Score reflects how favorable this decision is from the{" "}
-                        {p.name} perspective. Key considerations are derived
-                        from the tensions and tradeoffs above.
-                      </p>
+                      {p.reasoning && (
+                        <div>
+                          <p className="text-[10px] font-medium text-white/50 uppercase tracking-wider mb-1">
+                            Breakdown
+                          </p>
+                          <p className="text-xs text-white/80 leading-relaxed">
+                            {p.reasoning}
+                          </p>
+                        </div>
+                      )}
+                      {p.key_evidence && p.key_evidence.length > 0 && (
+                        <div>
+                          <p className="text-[10px] font-medium text-emerald-400/80 uppercase tracking-wider mb-1.5">
+                            Key evidence considered
+                          </p>
+                          <ul className="space-y-1 text-xs text-white/75">
+                            {p.key_evidence.map((ev, j) => (
+                              <li key={j} className="flex gap-2">
+                                <span className="text-emerald-400 shrink-0">•</span>
+                                {ev}
+                              </li>
+                            ))}
+                          </ul>
+                        </div>
+                      )}
+                      {p.key_evidence_missed && p.key_evidence_missed.length > 0 && (
+                        <div>
+                          <p className="text-[10px] font-medium text-amber-400/80 uppercase tracking-wider mb-1.5">
+                            Key evidence missed / blind spots
+                          </p>
+                          <ul className="space-y-1 text-xs text-white/75">
+                            {p.key_evidence_missed.map((ev, j) => (
+                              <li key={j} className="flex gap-2">
+                                <span className="text-amber-400 shrink-0">•</span>
+                                {ev}
+                              </li>
+                            ))}
+                          </ul>
+                        </div>
+                      )}
+                      {!p.reasoning && !p.key_evidence?.length && !p.key_evidence_missed?.length && (
+                        <p className="text-xs text-white/60">
+                          Score reflects how favorable this decision is from the{" "}
+                          {p.name} perspective.
+                        </p>
+                      )}
                     </div>
                   )}
                 </div>
