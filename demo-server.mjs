@@ -31,7 +31,7 @@ Output must include:
 8. "paths" — array of 3: { "id": "path_a"|"path_b"|"path_c", "title": string, "description": string, "favored_by": [{ "persona": string }] }.
 9. "next_steps" — array of 3 strings, action-verb + (owner, timeline).
 
-Output ONLY the JSON. No markdown, no code fences. Be direct and executive.`;
+CRITICAL: Output ONLY valid JSON. No markdown, no code fences, no explanation. Start with { and end with }.`;
 
 app.post("/api/demo-analysis", async (req, res) => {
   const { title, description, role, company_stage, industry } = req.body || {};
@@ -70,7 +70,7 @@ User profile (use this to tailor the analysis):
   try {
     const resp = await anthropic.messages.create({
       model: "claude-haiku-4-5-20251001",
-      max_tokens: 1600,
+      max_tokens: 2000,
       system: SYSTEM_PROMPT,
       messages: [{ role: "user", content: userPrompt }],
     });
@@ -81,8 +81,20 @@ User profile (use this to tailor the analysis):
         ? first.text.trim()
         : "";
 
+    // Extract JSON: prefer code fence, else find outermost { ... }
     const fenceMatch = text.match(/```(?:json)?\s*([\s\S]*?)```/);
-    if (fenceMatch) text = fenceMatch[1].trim();
+    if (fenceMatch) {
+      text = fenceMatch[1].trim();
+    } else {
+      const braceStart = text.indexOf("{");
+      const braceEnd = text.lastIndexOf("}");
+      if (braceStart !== -1 && braceEnd > braceStart) {
+        text = text.slice(braceStart, braceEnd + 1);
+      }
+    }
+
+    // Fix common JSON issues: trailing commas
+    text = text.replace(/,(\s*[}\]])/g, "$1");
 
     const result = JSON.parse(text);
     result.decision_title = trimmedTitle;
