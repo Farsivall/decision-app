@@ -394,7 +394,8 @@ export function ResultPanel({
             </p>
             <ul className="space-y-1.5 text-xs sm:text-sm text-white/85">
               {agreementItems.map((item, i) => (
-                <li key={i} className="leading-relaxed">
+                <li key={i} className="flex items-start gap-2 leading-relaxed">
+                  <span className="text-emerald-400 mt-0.5 shrink-0">•</span>
                   <ColorCodedText text={item} />
                 </li>
               ))}
@@ -407,7 +408,7 @@ export function ResultPanel({
               <span className="w-1.5 h-1.5 rounded-full bg-amber-500" />
               Where experts disagree
             </p>
-            <ul className="space-y-1.5 text-xs sm:text-sm text-white/85">
+            <ul className="space-y-2 text-xs sm:text-sm text-white/85">
               {Array.isArray(result.tradeoffs) ? (
                 result.tradeoffs.map((t, i) => {
                   const colorA = getPersonaColor(t.persona_a);
@@ -415,27 +416,31 @@ export function ResultPanel({
                   return (
                     <li
                       key={i}
-                      className={`rounded-lg border border-white/10 px-3 py-2 leading-relaxed text-xs sm:text-sm ${i % 2 === 0 ? "bg-white/[0.07]" : "bg-white/[0.04]"}`}
+                      className="flex items-start gap-2 leading-relaxed"
                     >
-                      <span className="font-semibold text-white/95">
-                        <span style={{ color: colorA }} className="font-medium">
-                          {t.persona_a}
-                        </span>{" "}
-                        ({t.score_a}) vs{" "}
-                        <span style={{ color: colorB }} className="font-medium">
-                          {t.persona_b}
-                        </span>{" "}
-                        ({t.score_b})
-                      </span>
-                      <span className="text-white/75">
-                        {" "}
-                        — {t.explanation}
-                      </span>
+                      <span className="text-amber-400 mt-0.5 shrink-0">•</span>
+                      <div>
+                        <span className="font-semibold text-white/95">
+                          <span style={{ color: colorA }} className="font-medium">
+                            {t.persona_a}
+                          </span>{" "}
+                          ({t.score_a}) vs{" "}
+                          <span style={{ color: colorB }} className="font-medium">
+                            {t.persona_b}
+                          </span>{" "}
+                          ({t.score_b})
+                        </span>
+                        <span className="text-white/75">
+                          {" "}
+                          — {t.explanation}
+                        </span>
+                      </div>
                     </li>
                   );
                 })
               ) : (
-                <li className="leading-relaxed">
+                <li className="flex items-start gap-2 leading-relaxed">
+                  <span className="text-amber-400 shrink-0">•</span>
                   <ColorCodedText text={String(result.tradeoffs)} />
                 </li>
               )}
