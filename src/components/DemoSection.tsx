@@ -321,7 +321,7 @@ export function ResultPanel({
   return (
     <div
       ref={panelRef}
-      className="bg-[#1e1e2e] border border-white/10 rounded-xl sm:rounded-2xl shadow-2xl max-w-4xl w-full overflow-hidden"
+      className="bg-[#1e1e2e]/95 max-w-4xl w-full overflow-hidden"
     >
       {/* Header Bar */}
       <div className="flex flex-col sm:flex-row sm:flex-wrap sm:items-center sm:justify-between gap-2 sm:gap-3 px-4 sm:px-6 pt-4 sm:pt-5 pb-3 sm:pb-4 border-b border-white/10">
@@ -830,7 +830,7 @@ const DemoSection = () => {
   return (
     <section
       id="demo"
-      className="py-16 sm:py-20 md:py-24 relative z-10"
+      className={`relative z-10 ${result ? "py-6 sm:py-8 md:py-10" : "py-16 sm:py-20 md:py-24"}`}
     >
       <div className="container max-w-5xl relative">
         {/* Decisions made — top right, fixed on mobile to avoid covering content */}
@@ -845,8 +845,8 @@ const DemoSection = () => {
           </div>
         </div>
 
-        {/* Heading — hidden when loading */}
-        <div className={`max-w-2xl mx-auto text-center mb-8 sm:mb-10 transition-opacity ${loading ? "hidden" : ""}`}>
+        {/* Heading — hidden when loading or when result shown */}
+        <div className={`max-w-2xl mx-auto text-center mb-8 sm:mb-10 transition-opacity ${loading || result ? "hidden" : ""}`}>
           <SectionLabel>Decision Analysis</SectionLabel>
           <h2 className="text-xl sm:text-2xl md:text-3xl lg:text-4xl font-bold text-foreground mb-2 sm:mb-3">
             See how Shura structures a decision
@@ -857,10 +857,10 @@ const DemoSection = () => {
           </p>
         </div>
 
-        {/* Form — hidden when loading */}
+        {/* Form — hidden when loading or when result shown */}
         <form
           onSubmit={handleSubmit}
-          className={`max-w-2xl mx-auto space-y-5 sm:space-y-6 mb-10 sm:mb-12 transition-opacity ${loading ? "hidden" : ""}`}
+          className={`max-w-2xl mx-auto space-y-5 sm:space-y-6 mb-10 sm:mb-12 transition-opacity ${loading || result ? "hidden" : ""}`}
         >
           <div className="space-y-2">
             <label
@@ -976,24 +976,21 @@ const DemoSection = () => {
           </div>
         )}
 
-        {/* Result */}
+        {/* Result — full-page analysis, no extra boxes */}
         {!loading && result && (
-          <div className="max-w-4xl mx-auto space-y-4 px-2 sm:px-0">
-            <ResultPanel result={result} panelRef={resultRef} decisionId={decisionId} />
-
-            {/* Action buttons */}
-            <div className="flex flex-col sm:flex-row flex-wrap gap-2 sm:gap-3 justify-center items-stretch sm:items-center">
-              <Button variant="secondary" size="sm" onClick={handleDownloadPdf} className="w-full sm:w-auto">
+          <div className="w-full max-w-4xl mx-auto -mt-4 sm:-mt-6">
+            {/* Minimal action bar */}
+            <div className="flex flex-wrap gap-2 sm:gap-3 justify-center sm:justify-end mb-4 sm:mb-6 px-2">
+              <Button variant="secondary" size="sm" onClick={handleDownloadPdf}>
                 <Download className="w-3.5 h-3.5 mr-1.5" />
                 Download PDF
               </Button>
-              <Button variant="outline" size="sm" onClick={handleCopyLink} className="w-full sm:w-auto">
+              <Button variant="outline" size="sm" onClick={handleCopyLink}>
                 Share decision link with team
               </Button>
               <Button
                 variant="ghost"
                 size="sm"
-                className="w-full sm:w-auto"
                 onClick={() => {
                   setResult(null);
                   setDecision("");
@@ -1007,16 +1004,7 @@ const DemoSection = () => {
                 Try another decision
               </Button>
             </div>
-
-            {/* Post-analysis CTA: save / share */}
-            <div className="rounded-lg sm:rounded-xl border border-white/10 bg-white/[0.02] p-4 sm:p-5 mt-4 sm:mt-6">
-              <p className="text-sm font-medium text-white/90 mb-2">
-                Save this analysis
-              </p>
-              <p className="text-xs text-white/60">
-                Share the decision link with your team to get their input.
-              </p>
-            </div>
+            <ResultPanel result={result} panelRef={resultRef} decisionId={decisionId} />
           </div>
         )}
       </div>
