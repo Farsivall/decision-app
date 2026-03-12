@@ -23,7 +23,7 @@ const SYSTEM_PROMPT = `You are Shura, a strategic decision analysis engine. Prod
 Output must include:
 1. "decision_question" — "Should we...?" question.
 2. "decision_summary" — 1–2 sentences.
-3. "personas" — array of 5 objects. Each: { "name": string, "score": number (0–100), "reasoning": string (1–2 sentences on why this score), "key_evidence": string[] (2–3 bullets of evidence considered), "key_evidence_missed": string[] (1–2 bullets of evidence gaps or blind spots) }. Names: Legal, Financial, Technical, Business Development, Tax.
+3. "personas" — array of 5 objects. Each: { "name": string, "score": number (0–100), "reasoning": string (1 sentence), "key_evidence": string[] (2 short bullets), "key_evidence_missed": string[] (1 short bullet) }. Names: Legal, Financial, Technical, Business Development, Tax. Keep each field brief.
 4. "core_tensions" — array of 2–3: { "title": string, "explanation": string, "raised_by": string }. Title format: "Issue A (Persona) vs Issue B (Persona)" e.g. "Regulatory risk (Legal) vs market opportunity (Business Dev)".
 5. "agreement" — one paragraph (2–4 sentences) describing what all perspectives broadly agree on. Reference persona names where useful.
 6. "tradeoffs" — array of 2–3 objects: { "persona_a": string, "score_a": number, "persona_b": string, "score_b": number, "explanation": string }. Each object is one disagreement between two named personas with their scores and a 1–2 sentence explanation of the clash. Do NOT combine multiple disagreements into one object.
@@ -70,7 +70,7 @@ User profile (use this to tailor the analysis):
   try {
     const resp = await anthropic.messages.create({
       model: "claude-haiku-4-5-20251001",
-      max_tokens: 2800,
+      max_tokens: 2000,
       system: SYSTEM_PROMPT,
       messages: [{ role: "user", content: userPrompt }],
     });
