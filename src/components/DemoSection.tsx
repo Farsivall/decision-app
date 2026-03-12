@@ -79,7 +79,7 @@ function LoadingAnalysis() {
           {LOADING_MESSAGES[messageIndex]}
         </p>
         <p className="text-xs text-white/50">
-          This may take 30–45 seconds
+          This may take up to 30 seconds
         </p>
         <div className="mt-6 flex justify-center gap-1">
           {LOADING_MESSAGES.map((_, i) => (
